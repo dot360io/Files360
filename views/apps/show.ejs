@@ -1,0 +1,90 @@
+<%- include('../partials/shell-start', { crumbs: [{ label: 'Apps', href: '/apps' }, { label: app.name }] }) %>
+<%- include('../partials/app-header') %>
+
+<% const saved = fmt.reduction(app.stats.bytesIn, app.stats.bytesOut); %>
+<div class="stats">
+  <div class="panel stat">
+    <div class="stat-top"><span>Files</span><span class="stat-icon"><%- icon('image') %></span></div>
+    <div class="stat-value"><%= fmt.number(app.stats.images) %></div>
+    <div class="stat-sub">Since <%= fmt.date(app.createdAt).split(',')[0] %></div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-top"><span>Storage used</span><span class="stat-icon violet"><%- icon('database') %></span></div>
+    <div class="stat-value"><%= fmt.bytes(app.stats.bytesOut) %></div>
+    <div class="stat-sub">All generated sizes</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-top"><span>Uploaded</span><span class="stat-icon amber"><%- icon('cloudUp') %></span></div>
+    <div class="stat-value"><%= fmt.bytes(app.stats.bytesIn) %></div>
+    <div class="stat-sub">Original files received</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-top"><span>Saved</span><span class="stat-icon green"><%- icon('zap') %></span></div>
+    <div class="stat-value"><%= saved %>%</div>
+    <div class="meter green"><span style="width: <%= saved %>%"></span></div>
+  </div>
+</div>
+
+<div class="grid-2-1">
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>Recent uploads</h2><p>Latest files in <%= app.slug %>/</p></div>
+      <a class="btn btn-sm" href="/library?app=<%= app._id %>">View all</a>
+    </div>
+    <div class="panel-body">
+      <% if (recent.length === 0) { %>
+        <div class="empty-state">
+          <div class="empty-icon"><%- icon('cloudUp') %></div>
+          <h2>Nothing uploaded yet</h2>
+          <p>Upload a test file, or share the integration guide with the developer connecting this app.</p>
+          <div class="actions center">
+            <button class="btn btn-primary" type="button" data-open-dialog="upload-dialog"><%- icon('upload') %>Upload files</button>
+            <a class="btn" href="/apps/<%= app._id %>/integration"><%- icon('book') %>Integration guide</a>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="asset-grid">
+          <% recent.forEach(function (image) { %>
+            <%- include('../partials/asset-card', { image: image }) %>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </section>
+
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Configuration</h2><p>Applied to every new upload</p></div>
+        <a class="btn btn-sm" href="/apps/<%= app._id %>/settings">Edit</a>
+      </div>
+      <div class="panel-body">
+        <dl class="kv">
+          <dt>Format</dt><dd><%= fmt.formatName(app.format) %>, quality <%= app.quality %></dd>
+          <dt>Max upload</dt><dd><%= app.maxUploadMB %> MB</dd>
+          <dt>Documents</dt><dd><%= app.allowDocuments === false ? 'Images only' : 'PDF, Word, Excel, PowerPoint, CSV, text' %></dd>
+          <dt>Archives</dt><dd><%= app.allowArchives ? 'ZIP accepted' : 'Not accepted' %></dd>
+          <dt>Original</dt><dd><%= app.keepOriginal ? 'Kept privately' : 'Not kept' %></dd>
+          <dt>API keys</dt><dd><a href="/apps/<%= app._id %>/keys"><%= activeKeys %> active</a></dd>
+        </dl>
+        <div class="label mt-16">Sizes</div>
+        <div class="chips">
+          <% app.variants.forEach(function (v) { %>
+            <span class="chip"><strong><%= v.name %></strong><%= v.width || 'auto' %>×<%= v.height || 'auto' %></span>
+          <% }) %>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Quick connect</h2><p>Test a key from your terminal</p></div></div>
+      <div class="panel-body">
+        <% const curl = 'curl -X POST ' + publicUrl + '/v1/images \\\n  -H "Authorization: Bearer $FILES360_API_KEY" \\\n  -F "file=@photo.jpg" \\\n  -F "folder=products"'; %>
+        <div class="code-block"><pre><%= curl %></pre><button class="btn" type="button" data-copy="<%= curl %>">Copy</button></div>
+        <a class="btn btn-sm mt-16" href="/apps/<%= app._id %>/integration/download"><%- icon('download') %>Download integration guide</a>
+      </div>
+    </section>
+  </div>
+</div>
+
+<%- include('../partials/shell-end') %>

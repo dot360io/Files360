@@ -1,0 +1,73 @@
+<%- include('../partials/shell-start', { crumbs: [{ label: 'Apps', href: '/apps' }, { label: app.name, href: '/apps/' + app._id }, { label: 'API keys' }] }) %>
+<%- include('../partials/app-header') %>
+
+<% if (newKey) { %>
+  <div class="key-reveal" role="alert">
+    <h2><%- icon('key') %>Your new API key "<%= newKey.label %>"</h2>
+    <p>Copy it now and store it in the app's environment variables. For security it is stored hashed and can't be shown again.</p>
+    <div class="input-group">
+      <input type="text" value="<%= newKey.key %>" readonly aria-label="API key" data-select-on-focus>
+      <button class="btn btn-primary" type="button" data-copy="<%= newKey.key %>"><%- icon('copy') %>Copy key</button>
+    </div>
+  </div>
+<% } %>
+
+<div class="grid-2-1">
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>API keys</h2><p>Keys authenticate requests from this app's backend</p></div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Name</th><th>Key</th><th>Created</th><th>Last used</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% if (keys.length === 0) { %>
+            <tr><td colspan="6" class="muted">No keys yet. Generate one to connect this app.</td></tr>
+          <% } %>
+          <% keys.forEach(function (k) { %>
+            <tr class="<%= k.revokedAt ? 'is-revoked' : '' %>">
+              <td><strong><%= k.label %></strong></td>
+              <td><span class="key-mask">img_<%= k.prefix %>_••••<%= k.last4 %></span></td>
+              <td class="num" title="<%= fmt.date(k.createdAt) %>"><%= fmt.ago(k.createdAt) %></td>
+              <td class="num" title="<%= fmt.date(k.lastUsedAt) %>"><%= fmt.ago(k.lastUsedAt) %></td>
+              <td><span class="pill <%= k.revokedAt ? 'off' : '' %>"><%= k.revokedAt ? 'Revoked' : 'Active' %></span></td>
+              <td class="right">
+                <% if (!k.revokedAt) { %>
+                  <form method="post" action="/apps/<%= app._id %>/keys/<%= k._id %>/revoke" data-confirm="Revoke &quot;<%= k.label %>&quot;? Requests with this key fail immediately.">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <button class="btn btn-sm btn-danger" type="submit">Revoke</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="stack">
+    <form class="panel" method="post" action="/apps/<%= app._id %>/keys">
+      <div class="panel-head"><div><h2>Generate a key</h2><p>Use one key per environment</p></div></div>
+      <div class="panel-body">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="field">
+          <label for="key-label">Name</label>
+          <input id="key-label" name="label" type="text" maxlength="60" placeholder="e.g. production" required>
+        </div>
+        <button class="btn btn-primary" type="submit"><%- icon('plus') %>Generate key</button>
+      </div>
+    </form>
+    <div class="alert alert-info">
+      <%- icon('info') %>
+      <div>
+        <strong>Rotating a key</strong>
+        Generate a new key, deploy it to the app, then revoke the old one. Keys belong on the server only, never in browser or mobile code.
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/shell-end') %>

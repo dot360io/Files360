@@ -1,0 +1,89 @@
+<%- include('../partials/shell-start', { crumbs: [{ label: 'Apps' }] }) %>
+
+<div class="page-head">
+  <div>
+    <h1>Apps</h1>
+    <p>Each app has its own folder, API keys, sizes and integration guide.</p>
+  </div>
+  <button class="btn btn-primary" type="button" data-open-dialog="create-app-dialog"><%- icon('plus') %>Create app</button>
+</div>
+
+<div class="app-cards">
+  <% apps.forEach(function (a) { %>
+    <a class="panel app-card" href="/apps/<%= a._id %>">
+      <% if (a.previews && a.previews.length) { %>
+        <div class="mosaic">
+          <% for (let i = 0; i < 4; i++) {
+               const p = a.previews[i];
+               const isDoc = fmt.isDocument(p);
+               const doc = isDoc ? fmt.documentType(p.input.format) : null;
+               const t = p && !isDoc ? fmt.assetThumb(p) : null; %>
+            <span class="<%= isDoc ? 'file-tile tone-' + doc.tone : 'checker' %>">
+              <% if (isDoc) { %><%- icon(doc.icon) %><% } else if (t) { %><img src="<%= t.url %>" alt="" loading="lazy"><% } %>
+            </span>
+          <% } %>
+        </div>
+      <% } else { %>
+        <div class="mosaic empty"><%- icon('image') %></div>
+      <% } %>
+      <div class="app-card-body">
+        <div class="app-card-title">
+          <span class="avatar" style="--h: <%= fmt.hue(a.slug) %>"><%= fmt.initials(a.name) %></span>
+          <div class="title"><strong><%= a.name %></strong><small><%= a.slug %>/</small></div>
+          <span class="pill <%= a.active ? '' : 'off' %>"><%= a.active ? 'Active' : 'Disabled' %></span>
+        </div>
+        <div class="app-card-stats">
+          <div><span>Files</span><strong><%= fmt.number(a.stats.images) %></strong></div>
+          <div><span>Storage</span><strong><%= fmt.bytes(a.stats.bytesOut) %></strong></div>
+          <div><span>Active keys</span><strong><%= a.keyCount %></strong></div>
+        </div>
+      </div>
+    </a>
+  <% }) %>
+  <button class="panel app-card create" type="button" data-open-dialog="create-app-dialog">
+    <span>
+      <span class="stat-icon"><%- icon('plus') %></span>
+      <strong>Create app</strong><br>
+      <span class="muted">Get a folder and API key for a new project</span>
+    </span>
+  </button>
+</div>
+
+<dialog class="modal" id="create-app-dialog" aria-labelledby="create-app-title" <%- openCreate ? 'data-open-on-load' : '' %>>
+  <form method="post" action="/apps">
+    <div class="modal-head">
+      <div>
+        <h2 id="create-app-title">Create app</h2>
+        <p>A first API key is created with the app.</p>
+      </div>
+      <button class="icon-btn" type="button" data-close-dialog aria-label="Close"><%- icon('x') %></button>
+    </div>
+    <div class="modal-body">
+      <% if (error) { %>
+        <div class="alert alert-danger field" role="alert"><%- icon('alert') %><div><%= error %></div></div>
+      <% } %>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field">
+        <label for="app-name">Name</label>
+        <input id="app-name" name="name" type="text" maxlength="80" required value="<%= form.name || '' %>" placeholder="e.g. Transfer.360" data-slug-source>
+      </div>
+      <div class="field">
+        <label for="app-slug">Folder</label>
+        <div class="input-suffix">
+          <input id="app-slug" name="slug" type="text" maxlength="40" pattern="[a-z0-9][a-z0-9\-]{1,39}" value="<%= form.slug || '' %>" placeholder="transfer-360" data-slug-target>
+          <span>/</span>
+        </div>
+        <p class="hint">Lowercase latin letters, numbers and dashes. Filled from the name if empty. It can't change later.</p>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span></span>
+      <div class="actions">
+        <button class="btn" type="button" data-close-dialog>Cancel</button>
+        <button class="btn btn-primary" type="submit">Create app</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<%- include('../partials/shell-end') %>

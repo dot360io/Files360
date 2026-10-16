@@ -1,0 +1,127 @@
+<%- include('../partials/shell-start', { crumbs: [{ label: 'Storage' }] }) %>
+
+<div class="page-head">
+  <div>
+    <h1>Storage</h1>
+    <p>Buckets this service uploads to. Every app can use its own, or fall back to the default.</p>
+  </div>
+  <a class="btn btn-primary" href="/storage/new"><%- icon('plus') %>Connect storage</a>
+</div>
+
+<% if (buckets.length === 0) { %>
+  <section class="panel empty-state">
+    <span class="stat-icon"><%- icon('database') %></span>
+    <h2>No storage connected yet</h2>
+    <p>Uploads are rejected until at least one bucket is connected. Pick a provider and paste a key pair — everything else is filled in for you.</p>
+    <a class="btn btn-primary" href="/storage/new"><%- icon('plus') %>Connect storage</a>
+  </section>
+<% } else { %>
+
+  <% if (unassigned > 0 && !buckets.some((b) => b.isDefault && b.active)) { %>
+    <div class="alert alert-warning" role="alert">
+      <%- icon('alert') %>
+      <div><strong>No active default.</strong> <%= unassigned %> <%= unassigned === 1 ? 'app has' : 'apps have' %> no storage of their own and uploads will fail. Make one of these the default.</div>
+    </div>
+  <% } %>
+
+  <div class="stack mt-16">
+    <% buckets.forEach(function (b) { %>
+      <section class="panel bucket-card <%= b.active ? '' : 'is-off' %>">
+        <div class="bucket-head">
+          <span class="provider-logo-wrap sm"><%- logo(b.provider) %></span>
+          <div class="bucket-id">
+            <h2>
+              <span class="bucket-name"><%= b.name %></span>
+              <% if (b.isDefault) { %><span class="pill">Default</span><% } %>
+              <% if (!b.active) { %><span class="pill off">Off</span><% } %>
+            </h2>
+            <p><%= b.providerLabel %> · <code><%= b.bucket %></code><%= b.region ? ' · ' + b.region : '' %></p>
+          </div>
+          <div class="bucket-actions">
+            <% if (b.status && b.status.ok === true && b.status.publicOk !== false) { %>
+              <span class="pill" title="Checked <%= fmt.ago(b.status.checkedAt) %>">Working</span>
+            <% } else if (b.status && b.status.ok === true) { %>
+              <span class="pill neutral" title="<%= b.publicUrl %> did not serve the test file">Not public</span>
+            <% } else if (b.status && b.status.ok === false) { %>
+              <span class="pill off" title="<%= b.status.error || '' %>">Failing</span>
+            <% } else { %>
+              <span class="pill neutral">Untested</span>
+            <% } %>
+            <a class="btn btn-sm" href="/storage/<%= b._id %>/edit"><%- icon('sliders') %>Edit</a>
+            <form method="post" action="/storage/<%= b._id %>/test">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <button class="btn btn-sm" type="submit"><%- icon('zap') %>Test</button>
+            </form>
+          </div>
+        </div>
+
+        <% if (b.status && b.status.ok === false && b.status.error) { %>
+          <div class="panel-pad"><div class="alert alert-danger" role="alert"><%- icon('alert') %><div><%= b.status.error %></div></div></div>
+        <% } else if (b.status && b.status.publicOk === false) { %>
+          <div class="panel-pad">
+            <div class="alert alert-warning" role="alert">
+              <%- icon('alert') %>
+              <div>Uploads work, but <code><%= b.publicUrl %></code> did not return the test file. Make the bucket public at the provider, or correct the public URL.</div>
+            </div>
+          </div>
+        <% } %>
+
+        <div class="bucket-stats">
+          <div><span>Apps</span><strong><%= b.appCount %></strong></div>
+          <div><span>Images</span><strong><%= fmt.number(b.imageCount) %></strong></div>
+          <div><span>Access key</span><strong><code><%= b.accessKeyMasked %></code></strong></div>
+          <div><span>Permissions</span><strong><%= b.supportsAcl ? 'Per-object' : 'Bucket-wide' %></strong></div>
+        </div>
+
+        <div class="panel-foot bucket-foot">
+          <a class="asset-link" href="<%= b.publicUrl %>" target="_blank" rel="noopener noreferrer" title="<%= b.publicUrl %>"><%= b.publicUrl %><%- icon('external') %></a>
+          <div class="actions">
+            <% if (!b.isDefault && b.active) { %>
+              <form method="post" action="/storage/<%= b._id %>/default">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="btn btn-sm" type="submit"><%- icon('check') %>Make default</button>
+              </form>
+            <% } %>
+            <form method="post" action="/storage/<%= b._id %>/toggle" <%- b.active ? 'data-confirm="Turn this storage off? Apps pointed at it will fail to upload."' : '' %>>
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <button class="btn btn-sm" type="submit"><%- icon('power') %><%= b.active ? 'Turn off' : 'Turn on' %></button>
+            </form>
+            <% if (b.appCount === 0 && b.imageCount === 0) { %>
+              <button class="btn btn-sm btn-ghost" type="button" data-open-dialog="remove-<%= b._id %>"><%- icon('trash') %>Remove</button>
+            <% } %>
+          </div>
+        </div>
+      </section>
+
+      <% if (b.appCount === 0 && b.imageCount === 0) { %>
+        <dialog class="modal" id="remove-<%= b._id %>" aria-labelledby="remove-title-<%= b._id %>">
+          <form method="post" action="/storage/<%= b._id %>/delete">
+            <div class="modal-head">
+              <div>
+                <h2 id="remove-title-<%= b._id %>">Remove <%= b.name %>?</h2>
+                <p>It disappears from this dashboard only. No bucket, file or key is deleted at <%= b.providerLabel %>.</p>
+              </div>
+              <button class="icon-btn" type="button" data-close-dialog aria-label="Close"><%- icon('x') %></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <div class="field">
+                <label for="confirm-<%= b._id %>">Type <code><%= b.name %></code> to confirm</label>
+                <input id="confirm-<%= b._id %>" name="confirm" type="text" placeholder="<%= b.name %>" autocomplete="off" required>
+              </div>
+            </div>
+            <div class="modal-foot">
+              <span></span>
+              <div class="actions">
+                <button class="btn" type="button" data-close-dialog>Cancel</button>
+                <button class="btn btn-danger" type="submit"><%- icon('trash') %>Remove</button>
+              </div>
+            </div>
+          </form>
+        </dialog>
+      <% } %>
+    <% }) %>
+  </div>
+<% } %>
+
+<%- include('../partials/shell-end') %>

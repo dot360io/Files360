@@ -1,0 +1,193 @@
+<%
+  const isDoc = fmt.isDocument(image);
+  const doc = isDoc ? fmt.documentType(image.input.format) : null;
+  const sizes = isDoc ? [] : [...image.variants].sort((a, b) => a.width - b.width);
+  const largest = isDoc ? null : sizes[sizes.length - 1];
+  const url = fmt.assetUrl(image);
+  const ownerName = image.app ? image.app.name : 'Deleted app';
+  const crumbs = [{ label: 'Media library', href: '/library' }];
+  if (image.app) crumbs.push({ label: image.app.name, href: '/library?app=' + image.app._id });
+  if (image.app && image.folder) crumbs.push({ label: image.folder, href: '/library?app=' + image.app._id + '&folder=' + encodeURIComponent(image.folder) });
+  crumbs.push({ label: image.originalName || (isDoc ? 'File' : 'Image') });
+  const saved = isDoc ? 0 : fmt.reduction(image.input.bytes, largest.bytes);
+  const vector = fmt.hasVector(image) ? image.file : null;
+  const cleaned = vector && image.preview ? [].concat(image.preview.removedElements || [], image.preview.removedAttributes || []) : [];
+  const sourceLabel = { upload: 'API upload', url: 'API import from URL', dashboard: 'Dashboard upload' }[image.source];
+  const embed = isDoc
+    ? '<a href="' + url + '" target="_blank" rel="noopener">' + (image.originalName || image.file.name) + '</a>'
+    : '<img\n  src="' + largest.url + '"' + (api.srcset ? '\n  srcset="' + api.srcset + '"\n  sizes="(max-width: 768px) 100vw, 800px"' : '') + '\n  width="' + largest.width + '" height="' + largest.height + '"\n  loading="lazy"\n  alt="">';
+%>
+<%- include('../partials/shell-start', { crumbs: crumbs }) %>
+
+<div class="asset-page">
+  <section class="panel viewer">
+    <% if (isDoc) { %>
+      <%- include('../partials/file-preview', { image: image }) %>
+    <% } else { %>
+      <div class="viewer-bar">
+        <div class="segmented" role="group" aria-label="Preview size">
+          <% sizes.forEach(function (s) { %>
+            <button type="button" data-size-src="<%= s.url %>" data-size-meta="<%= s.width %>×<%= s.height %>, <%= fmt.bytes(s.bytes) %>, <%= fmt.formatName(s.format) %>" aria-pressed="<%= s === largest %>"><%= s.name %></button>
+          <% }) %>
+        </div>
+        <span class="viewer-meta" data-size-label><%= largest.width %>×<%= largest.height %>, <%= fmt.bytes(largest.bytes) %>, <%= fmt.formatName(largest.format) %></span>
+      </div>
+      <div class="viewer-stage checker">
+        <img id="viewer-img" src="<%= largest.url %>" alt="<%= image.originalName || '' %>" width="<%= largest.width %>" height="<%= largest.height %>">
+      </div>
+    <% } %>
+  </section>
+
+  <aside class="panel inspector">
+    <div class="inspector-head">
+      <h1><%= image.originalName || (isDoc ? 'Untitled file' : 'Untitled image') %></h1>
+      <div class="where"><%- icon('folder') %><span><%= image.app ? image.app.slug : '' %>/<%= image.folder %></span></div>
+      <div class="actions">
+        <button class="btn btn-primary btn-sm" type="button" data-copy="<%= url %>" data-copy-current><%- icon('copy') %>Copy URL</button>
+        <a class="btn btn-sm" href="<%= url %>" target="_blank" rel="noopener" data-open-current><%- icon('external') %>Open</a>
+        <form method="post" action="/library/<%= image._id %>/delete" data-confirm="<%= isDoc ? 'Delete this file from storage?' : 'Delete this image and all its sizes from storage?' %>">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn btn-sm btn-danger" type="submit"><%- icon('trash') %>Delete</button>
+        </form>
+      </div>
+    </div>
+
+    <nav class="tabs-nav compact" role="tablist">
+      <button type="button" role="tab" data-tab="summary" aria-selected="true">Summary</button>
+      <% if (isDoc) { %>
+        <button type="button" role="tab" data-tab="file" aria-selected="false">File</button>
+      <% } else { %>
+        <button type="button" role="tab" data-tab="sizes" aria-selected="false">Sizes</button>
+      <% } %>
+      <button type="button" role="tab" data-tab="embed" aria-selected="false">Embed</button>
+    </nav>
+
+    <div class="inspector-panel" data-tab-panel="summary">
+      <% if (isDoc) { %>
+        <div class="file-summary">
+          <span class="file-chip lg tone-<%= doc.tone %>"><%- icon(doc.icon) %><%= doc.badge %></span>
+          <div>
+            <strong><%= doc.name %></strong>
+            <span><%= fmt.bytes(image.file.bytes) %>, stored exactly as uploaded</span>
+          </div>
+        </div>
+        <dl class="kv">
+          <dt>App</dt><dd><% if (image.app) { %><a href="/apps/<%= image.app._id %>"><%= ownerName %></a><% } else { %><%= ownerName %><% } %></dd>
+          <dt>Type</dt><dd><%= doc.name %> (<%= fmt.formatName(image.input.format) %>)</dd>
+          <dt>Contents</dt><dd><%= fmt.previewSummary(image) || 'Not read' %></dd>
+          <% if (image.preview && image.preview.sheets && image.preview.sheets.length > 1) { %>
+            <dt>Sheets</dt><dd><%= image.preview.sheets.join(', ') %></dd>
+          <% } %>
+          <dt>Ref</dt><dd><%= image.ref || 'None' %></dd>
+          <dt>Source</dt><dd><%= sourceLabel %></dd>
+          <dt>Added</dt><dd><%= fmt.date(image.createdAt) %></dd>
+          <dt>ID</dt><dd><code><%= image._id %></code></dd>
+        </dl>
+        <% if (image.preview && image.preview.note) { %>
+          <div class="alert alert-info mt-16"><%- icon('info') %><div><%= image.preview.note %></div></div>
+        <% } %>
+      <% } else if (vector) { %>
+        <div class="file-summary">
+          <span class="file-chip lg tone-doc"><%- icon('image') %>SVG</span>
+          <div>
+            <strong>Vector source</strong>
+            <span>Drawn into <%= sizes.length %> <%= sizes.length === 1 ? 'size' : 'sizes' %>, and kept as SVG at <%= fmt.bytes(vector.bytes) %></span>
+          </div>
+        </div>
+        <dl class="kv">
+          <dt>App</dt><dd><% if (image.app) { %><a href="/apps/<%= image.app._id %>"><%= ownerName %></a><% } else { %><%= ownerName %><% } %></dd>
+          <dt>Input</dt><dd>SVG, <span class="num"><%= image.input.width %>×<%= image.input.height %></span> at its natural size</dd>
+          <dt>Output</dt><dd><%= fmt.formatName(largest.format) %>, <%= sizes.length %> <%= sizes.length === 1 ? 'size' : 'sizes' %>, <%= fmt.bytes(image.bytesOut) %> total</dd>
+          <dt>Vector</dt><dd><%= fmt.bytes(vector.bytes) %>, served as <code>image/svg+xml</code></dd>
+          <dt>Ref</dt><dd><%= image.ref || 'None' %></dd>
+          <dt>Source</dt><dd><%= sourceLabel %></dd>
+          <dt>Added</dt><dd><%= fmt.date(image.createdAt) %></dd>
+          <dt>ID</dt><dd><code><%= image._id %></code></dd>
+        </dl>
+        <% if (cleaned.length) { %>
+          <div class="alert alert-info mt-16">
+            <%- icon('info') %>
+            <div><strong>Cleaned before storing.</strong> Removed from the vector: <%= cleaned.join(', ') %>.</div>
+          </div>
+        <% } else { %>
+          <div class="alert alert-success mt-16">
+            <%- icon('check') %>
+            <div>Checked against the SVG allowlist. Nothing had to be removed.</div>
+          </div>
+        <% } %>
+      <% } else { %>
+        <div class="savings">
+          <div class="savings-top"><strong><%= saved %>% smaller</strong><span><%= largest.name %> vs uploaded file</span></div>
+          <div class="compare">
+            <div class="compare-row"><span>Uploaded</span><div class="meter grey"><span style="width: 100%"></span></div><span class="right"><%= fmt.bytes(image.input.bytes) %></span></div>
+            <div class="compare-row"><span><%= largest.name %></span><div class="meter green"><span style="width: <%= Math.max(2, 100 - saved) %>%"></span></div><span class="right"><%= fmt.bytes(largest.bytes) %></span></div>
+          </div>
+        </div>
+        <dl class="kv">
+          <dt>App</dt><dd><% if (image.app) { %><a href="/apps/<%= image.app._id %>"><%= ownerName %></a><% } else { %><%= ownerName %><% } %></dd>
+          <dt>Input</dt><dd><%= fmt.formatName(image.input.format) %>, <span class="num"><%= image.input.width %>×<%= image.input.height %></span></dd>
+          <dt>Output</dt><dd><%= fmt.formatName(largest.format) %>, <%= sizes.length %> <%= sizes.length === 1 ? 'size' : 'sizes' %>, <%= fmt.bytes(image.bytesOut) %> total</dd>
+          <dt>Ref</dt><dd><%= image.ref || 'None' %></dd>
+          <dt>Source</dt><dd><%= sourceLabel %></dd>
+          <dt>Added</dt><dd><%= fmt.date(image.createdAt) %></dd>
+          <dt>Backup</dt><dd><%= image.original && image.original.key ? 'Original kept privately' : 'Not kept' %></dd>
+          <dt>ID</dt><dd><code><%= image._id %></code></dd>
+        </dl>
+      <% } %>
+    </div>
+
+    <% if (isDoc) { %>
+      <div class="inspector-panel" data-tab-panel="file" hidden>
+        <span class="label">Public URL</span>
+        <div class="input-group">
+          <input type="text" value="<%= url %>" readonly aria-label="File URL" data-select-on-focus>
+          <button class="btn btn-sm" type="button" data-copy="<%= url %>" aria-label="Copy the file URL"><%- icon('copy') %></button>
+        </div>
+        <dl class="kv mt-16">
+          <dt>File name</dt><dd><%= image.file.name %></dd>
+          <dt>Media type</dt><dd><code><%= image.file.mime %></code></dd>
+          <dt>Size</dt><dd><%= fmt.bytes(image.file.bytes) %></dd>
+          <dt>Opens as</dt><dd><%= image.input.format === 'pdf' ? 'In the browser' : 'A download' %></dd>
+          <dt>Storage key</dt><dd><code><%= image.file.key %></code></dd>
+        </dl>
+        <a class="btn mt-16" href="<%= url %>" target="_blank" rel="noopener"><%- icon('download') %>Download the file</a>
+      </div>
+    <% } else { %>
+      <div class="inspector-panel" data-tab-panel="sizes" hidden>
+        <% if (vector) { %>
+          <div class="size-item mb-12">
+            <div class="size-item-top"><strong>vector <span class="badge">SVG</span></strong><span><%= fmt.bytes(vector.bytes) %></span></div>
+            <div class="input-group">
+              <input type="text" value="<%= vector.url %>" readonly aria-label="Vector URL">
+              <button class="btn btn-sm" type="button" data-copy="<%= vector.url %>" aria-label="Copy the vector URL"><%- icon('copy') %></button>
+            </div>
+          </div>
+        <% } %>
+        <ul class="size-list">
+          <% sizes.forEach(function (s) { %>
+            <li class="size-item">
+              <div class="size-item-top"><strong><%= s.name %> <span class="badge"><%= s.fit %></span></strong><span><%= s.width %>×<%= s.height %>, <%= fmt.bytes(s.bytes) %></span></div>
+              <div class="input-group">
+                <input type="text" value="<%= s.url %>" readonly aria-label="<%= s.name %> URL">
+                <button class="btn btn-sm" type="button" data-copy="<%= s.url %>" aria-label="Copy <%= s.name %> URL"><%- icon('copy') %></button>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+    <% } %>
+
+    <div class="inspector-panel" data-tab-panel="embed" hidden>
+      <span class="label"><%= isDoc ? 'Link' : 'Responsive HTML' %></span>
+      <div class="code-block"><pre><%= embed %></pre><button class="btn" type="button" data-copy="<%= embed %>">Copy</button></div>
+      <% if (!isDoc && api.srcset) { %>
+        <span class="label mt-16">srcset</span>
+        <div class="code-block"><pre><%= api.srcset %></pre><button class="btn" type="button" data-copy="<%= api.srcset %>">Copy</button></div>
+      <% } %>
+      <span class="label mt-16">API response</span>
+      <div class="code-block"><pre><%= JSON.stringify(api, null, 2) %></pre><button class="btn" type="button" data-copy="<%= JSON.stringify(api, null, 2) %>">Copy</button></div>
+    </div>
+  </aside>
+</div>
+
+<%- include('../partials/shell-end') %>

@@ -1,0 +1,120 @@
+<%- include('../partials/shell-start', { crumbs: [{ label: 'Dashboard' }] }) %>
+
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Usage across all your apps</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/apps?new=1"><%- icon('plus') %>Create app</a>
+    <a class="btn btn-primary" href="/library"><%- icon('image') %>Media library</a>
+  </div>
+</div>
+
+<% if (apps.length === 0) { %>
+  <div class="panel empty-state">
+    <div class="empty-icon"><%- icon('apps') %></div>
+    <h2>Create your first app</h2>
+    <p>An app gets its own folder, API key, sizes and integration guide. Connect it and images start showing up here.</p>
+    <a class="btn btn-primary" href="/apps?new=1"><%- icon('plus') %>Create app</a>
+  </div>
+<% } else { %>
+  <%
+    const saved = fmt.reduction(totals.bytesIn, totals.bytesOut);
+    const maxApp = Math.max(1, ...apps.map(a => a.stats.bytesOut || 0));
+    const W = 720, H = 220, top = 16, bottom = 28, left = 30;
+    const barW = (W - left) / chart.length;
+    const scaleMax = Math.max(4, Math.ceil(chartMax / 4) * 4);
+  %>
+  <div class="stats">
+    <div class="panel stat">
+      <div class="stat-top"><span>Files</span><span class="stat-icon"><%- icon('image') %></span></div>
+      <div class="stat-value"><%= fmt.number(totals.images) %></div>
+      <div class="stat-sub"><%= fmt.number(last30) %> uploaded in the last 30 days</div>
+    </div>
+    <div class="panel stat">
+      <div class="stat-top"><span>Storage used</span><span class="stat-icon violet"><%- icon('database') %></span></div>
+      <div class="stat-value"><%= fmt.bytes(totals.bytesOut) %></div>
+      <div class="stat-sub">All sizes across <%= apps.length %> <%= apps.length === 1 ? 'app' : 'apps' %></div>
+    </div>
+    <div class="panel stat">
+      <div class="stat-top"><span>Uploaded</span><span class="stat-icon amber"><%- icon('cloudUp') %></span></div>
+      <div class="stat-value"><%= fmt.bytes(totals.bytesIn) %></div>
+      <div class="stat-sub">Original files received</div>
+    </div>
+    <div class="panel stat">
+      <div class="stat-top"><span>Saved</span><span class="stat-icon green"><%- icon('zap') %></span></div>
+      <div class="stat-value"><%= saved %>%</div>
+      <div class="meter green"><span style="width: <%= saved %>%"></span></div>
+    </div>
+  </div>
+
+  <div class="grid-2-1">
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Uploads</h2><p>Images per day, last 30 days</p></div>
+      </div>
+      <div class="panel-body">
+        <svg class="chart" viewBox="0 0 <%= W %> <%= H %>" preserveAspectRatio="none" role="img" aria-label="Uploads per day">
+          <% [0, 0.5, 1].forEach(function (f) { const y = top + (H - top - bottom) * (1 - f); %>
+            <line class="gridline" x1="<%= left %>" x2="<%= W %>" y1="<%= y %>" y2="<%= y %>"></line>
+            <text class="axis" x="0" y="<%= y + 4 %>"><%= Math.round(scaleMax * f) %></text>
+          <% }) %>
+          <% chart.forEach(function (d, i) {
+               const h = Math.max(d.count ? 3 : 2, (H - top - bottom) * d.count / scaleMax);
+               const x = left + i * barW + barW * 0.18;
+               const y = H - bottom - h; %>
+            <g>
+              <title><%= d.label %>: <%= d.count %> <%= d.count === 1 ? 'file' : 'files' %>, <%= fmt.bytes(d.bytes) %></title>
+              <rect class="bar <%= d.count ? 'has' : '' %>" x="<%= x %>" y="<%= y %>" width="<%= barW * 0.64 %>" height="<%= h %>" rx="3"></rect>
+            </g>
+          <% }) %>
+          <% [[0, 'start', left + barW * 0.18], [14, 'middle', left + 14.5 * barW], [29, 'end', W]].forEach(function (a) { %>
+            <text class="axis" x="<%= a[2] %>" y="<%= H - 8 %>" text-anchor="<%= a[1] %>"><%= chart[a[0]].label %></text>
+          <% }) %>
+        </svg>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Storage by app</h2><p>Stored size of all generated images</p></div></div>
+      <div class="panel-body">
+        <ul class="usage-list">
+          <% apps.slice(0, 6).forEach(function (a) { %>
+            <li class="usage-row">
+              <span class="avatar sm" style="--h: <%= fmt.hue(a.slug) %>"><%= fmt.initials(a.name) %></span>
+              <a class="name" href="/apps/<%= a._id %>"><%= a.name %></a>
+              <span class="size"><%= fmt.bytes(a.stats.bytesOut) %></span>
+              <div class="meter"><span style="width: <%= Math.max(2, Math.round((a.stats.bytesOut || 0) / maxApp * 100)) %>%"></span></div>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel mt-20">
+    <div class="panel-head">
+      <div><h2>Recent uploads</h2><p>Latest files from all apps</p></div>
+      <a class="btn btn-sm" href="/library">View all</a>
+    </div>
+    <div class="panel-body">
+      <% if (recent.length === 0) { %>
+        <div class="empty-state">
+          <div class="empty-icon"><%- icon('cloudUp') %></div>
+          <h2>Nothing uploaded yet</h2>
+          <p>Upload a few files here or connect an app with its integration guide.</p>
+          <button class="btn btn-primary" type="button" data-open-dialog="upload-dialog"><%- icon('upload') %>Upload files</button>
+        </div>
+      <% } else { %>
+        <div class="asset-grid">
+          <% recent.forEach(function (image) { %>
+            <%- include('../partials/asset-card', { image: image, showWhere: true }) %>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </section>
+<% } %>
+
+<%- include('../partials/shell-end') %>

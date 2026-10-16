@@ -1,0 +1,28 @@
+<div class="app-header">
+  <div class="app-title">
+    <span class="avatar lg" style="--h: <%= fmt.hue(app.slug) %>"><%= fmt.initials(app.name) %></span>
+    <div>
+      <h1><%= app.name %> <span class="pill <%= app.active ? '' : 'off' %>"><%= app.active ? 'Active' : 'Disabled' %></span></h1>
+      <div class="muted">
+        <% if (locals.bucket) { %>
+          Folder <code><%= bucket %>/<%= app.slug %>/</code>
+          <% if (locals.storageName) { %>
+            <a class="subtle" href="/storage"><%= storageName %><%= locals.storageIsFallback ? ' (default)' : '' %></a>
+          <% } %>
+        <% } else { %>
+          <a class="subtle warn" href="/storage/new"><%- icon('alert') %>No storage connected</a>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/library?app=<%= app._id %>"><%- icon('image') %>Open in library</a>
+    <a class="btn" href="/apps/<%= app._id %>/integration/download"><%- icon('download') %>Integration guide</a>
+  </div>
+</div>
+<nav class="tabs-nav" aria-label="App sections">
+  <a href="/apps/<%= app._id %>" <%- tab === 'overview' ? 'aria-current="page"' : '' %>><%- icon('dashboard') %>Overview</a>
+  <a href="/apps/<%= app._id %>/keys" <%- tab === 'keys' ? 'aria-current="page"' : '' %>><%- icon('key') %>API keys</a>
+  <a href="/apps/<%= app._id %>/settings" <%- tab === 'settings' ? 'aria-current="page"' : '' %>><%- icon('sliders') %>Sizes and format</a>
+  <a href="/apps/<%= app._id %>/integration" <%- tab === 'integration' ? 'aria-current="page"' : '' %>><%- icon('code') %>Integration</a>
+</nav>

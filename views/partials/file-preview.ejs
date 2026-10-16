@@ -1,0 +1,170 @@
+<%
+  const preview = image.preview || { kind: 'none' };
+  const doc = fmt.documentType(image.input.format);
+  const url = image.file ? image.file.url : null;
+  const rows = preview.rows || [];
+  const blocks = preview.blocks || [];
+  const lines = preview.lines || [];
+  const slides = preview.slides || [];
+  const entries = preview.entries || [];
+  const head = preview.header && rows.length > 1 ? rows[0] : null;
+  const body = head ? rows.slice(1) : rows;
+  const isNumber = (value) => /^[-+]?[\d.,]+\s?[%€$]?$/.test(value) && /\d/.test(value);
+  const shown = [];
+  if (preview.sheet) shown.push('Sheet "' + preview.sheet + '"' + (preview.sheets && preview.sheets.length > 1 ? ' of ' + preview.sheets.length : ''));
+  const more = preview.rowCount && preview.rowCount > rows.length;
+  if (rows.length) shown.push((more ? 'Showing ' + fmt.number(rows.length) + ' of ' + fmt.number(preview.rowCount) : fmt.number(preview.rowCount || rows.length)) + (preview.rowCount === 1 ? ' row' : ' rows'));
+  if (preview.colCount) shown.push(fmt.number(preview.colCount) + (preview.colCount === 1 ? ' column' : ' columns'));
+  if (blocks.length) {
+    const all = !preview.blockCount || preview.blockCount <= blocks.length;
+    shown.push(
+      (all ? fmt.number(blocks.length) : 'First ' + fmt.number(blocks.length) + ' of ' + fmt.number(preview.blockCount)) +
+        (blocks.length === 1 && all ? ' paragraph' : ' paragraphs')
+    );
+  }
+  if (preview.delimiter) shown.push('Separated by "' + preview.delimiter + '"');
+  if (slides.length) shown.push(preview.slideCount > slides.length ? 'First ' + fmt.number(slides.length) + ' of ' + fmt.number(preview.slideCount) + ' slides' : fmt.number(preview.slideCount) + (preview.slideCount === 1 ? ' slide' : ' slides'));
+  if (lines.length) shown.push(preview.lineCount && preview.lineCount > lines.length ? 'First ' + fmt.number(lines.length) + ' of ' + fmt.number(preview.lineCount) + ' lines' : fmt.number(preview.lineCount || lines.length) + (preview.lineCount === 1 ? ' line' : ' lines'));
+  if (preview.entryCount) shown.push(fmt.number(preview.entryCount) + (preview.entryCount === 1 ? ' file' : ' files'));
+  if (preview.totalBytes) shown.push(fmt.bytes(preview.totalBytes) + ' unpacked');
+  if (preview.kind === 'meta' && preview.pages) shown.push(fmt.number(preview.pages) + (preview.pages === 1 ? ' page' : ' pages'));
+  if (preview.kind === 'meta' && preview.slides) shown.push(fmt.number(preview.slides) + ' slides');
+  if (preview.kind === 'meta' && preview.words) shown.push(fmt.number(preview.words) + ' words');
+%>
+<div class="viewer-bar">
+  <span class="file-chip tone-<%= doc.tone %>"><%- icon(doc.icon) %><%= doc.badge %></span>
+  <span class="viewer-meta"><%= shown.join(' · ') || doc.name %></span>
+  <% if (url) { %>
+    <a class="btn btn-sm" href="<%= url %>" target="_blank" rel="noopener"><%- icon('download') %>Download</a>
+  <% } %>
+</div>
+
+<% if (preview.kind === 'pdf' && url) { %>
+  <div class="viewer-stage pdf-stage">
+    <iframe class="pdf-frame" src="<%= url %>#view=FitH" title="<%= image.originalName || 'PDF' %>" loading="lazy"></iframe>
+    <p class="frame-fallback muted">
+      The PDF opens in the frame above. If your browser blocks it,
+      <a href="<%= url %>" target="_blank" rel="noopener">open the file in a new tab</a>.
+    </p>
+  </div>
+<% } else if (preview.kind === 'sheet' && rows.length) { %>
+  <div class="viewer-stage sheet-stage">
+    <div class="sheet-wrap">
+      <table class="sheet">
+        <% if (head) { %>
+          <thead>
+            <tr>
+              <th class="rownum" scope="col"></th>
+              <% head.forEach(function (cell) { %><th scope="col"><%= cell %></th><% }) %>
+            </tr>
+          </thead>
+        <% } %>
+        <tbody>
+          <% body.forEach(function (row, i) { %>
+            <tr>
+              <td class="rownum"><%= i + (head ? 2 : 1) %></td>
+              <% row.forEach(function (cell) { %><td class="<%= isNumber(cell) ? 'num' : '' %>"><%= cell %></td><% }) %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (preview.truncated) { %>
+      <p class="frame-fallback muted">This is the start of the file. Download it to see everything.</p>
+    <% } %>
+  </div>
+<% } else if (preview.kind === 'text' && blocks.length) { %>
+  <div class="viewer-stage text-stage">
+    <article class="doc-prose">
+      <% blocks.forEach(function (block) { %>
+        <% if (block.level === 1) { %><h2><%= block.text %></h2>
+        <% } else if (block.level === 2) { %><h3><%= block.text %></h3>
+        <% } else if (block.level === 3) { %><h4><%= block.text %></h4>
+        <% } else { %><p><%= block.text %></p><% } %>
+      <% }) %>
+    </article>
+    <% if (preview.truncated) { %>
+      <p class="frame-fallback muted">This is the start of the document. Download it to read the rest.</p>
+    <% } %>
+  </div>
+<% } else if (preview.kind === 'slides' && slides.length) { %>
+  <div class="viewer-stage slides-stage">
+    <ol class="slide-list">
+      <% slides.forEach(function (slide, i) { %>
+        <li class="slide">
+          <span class="slide-number"><%= i + 1 %></span>
+          <div class="slide-body">
+            <strong><%= slide.title || 'Untitled slide' %></strong>
+            <% if (slide.lines && slide.lines.length) { %>
+              <ul><% slide.lines.forEach(function (line) { %><li><%= line %></li><% }) %></ul>
+            <% } %>
+          </div>
+        </li>
+      <% }) %>
+    </ol>
+    <% if (preview.truncated) { %>
+      <p class="frame-fallback muted">Only the first slides are shown. Download the file for the rest.</p>
+    <% } %>
+  </div>
+<% } else if (preview.kind === 'plain' && lines.length) { %>
+  <div class="viewer-stage text-stage">
+    <div class="plain-text"><ol><% lines.forEach(function (line) { %><li><%= line %></li><% }) %></ol></div>
+    <% if (preview.truncated) { %>
+      <p class="frame-fallback muted">This is the start of the file. Download it to read the rest.</p>
+    <% } %>
+  </div>
+<% } else if (preview.kind === 'list' && entries.length) { %>
+  <div class="viewer-stage list-stage">
+    <table class="entry-table">
+      <thead><tr><th>Inside the archive</th><th class="right">Size</th></tr></thead>
+      <tbody>
+        <% entries.forEach(function (entry) { %>
+          <tr>
+            <td><span class="entry-icon"><%- icon(entry.directory ? 'folder' : 'file') %></span><%= entry.name %></td>
+            <td class="right num"><%= entry.directory ? '' : fmt.bytes(entry.bytes) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <p class="frame-fallback muted">
+      <%= preview.truncated ? 'Only the first entries are listed. ' : '' %>Nothing is unpacked here: the archive is stored and served exactly as uploaded.
+    </p>
+  </div>
+<% } else if (preview.kind === 'meta') { %>
+  <div class="viewer-stage meta-stage">
+    <div class="meta-card">
+      <span class="file-chip lg tone-<%= doc.tone %>"><%- icon(doc.icon) %><%= doc.badge %></span>
+      <h2><%= image.originalName || doc.name %></h2>
+      <p class="muted"><%= doc.name %>, <%= fmt.bytes(image.file.bytes) %></p>
+      <% if (preview.properties && preview.properties.length) { %>
+        <dl class="kv">
+          <% preview.properties.forEach(function (property) { %>
+            <dt><%= property.label %></dt><dd><%= property.value %></dd>
+          <% }) %>
+          <% if (preview.pages) { %><dt>Pages</dt><dd><%= fmt.number(preview.pages) %></dd><% } %>
+          <% if (preview.words) { %><dt>Words</dt><dd><%= fmt.number(preview.words) %></dd><% } %>
+          <% if (preview.slides) { %><dt>Slides</dt><dd><%= fmt.number(preview.slides) %></dd><% } %>
+        </dl>
+      <% } else { %>
+        <p class="muted">This file carries no document properties.</p>
+      <% } %>
+      <% if (preview.macros) { %>
+        <div class="alert alert-warning"><%- icon('alert') %><div><strong>Contains macros.</strong> Stored as uploaded and never run here.</div></div>
+      <% } %>
+      <% if (url) { %>
+        <a class="btn btn-primary" href="<%= url %>" target="_blank" rel="noopener"><%- icon('download') %>Download</a>
+      <% } %>
+    </div>
+  </div>
+<% } else { %>
+  <div class="viewer-stage">
+    <div class="empty-state">
+      <div class="empty-icon"><%- icon(doc.icon) %></div>
+      <h2>No preview for this file</h2>
+      <p><%= preview.note || 'The file is stored and can be downloaded, it just cannot be shown here.' %></p>
+      <% if (url) { %>
+        <a class="btn btn-primary" href="<%= url %>" target="_blank" rel="noopener"><%- icon('download') %>Download</a>
+      <% } %>
+    </div>
+  </div>
+<% } %>

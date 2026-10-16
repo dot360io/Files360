@@ -1,0 +1,211 @@
+<%- include('../partials/shell-start', { crumbs: [{ label: 'Apps', href: '/apps' }, { label: app.name, href: '/apps/' + app._id }, { label: 'Sizes and format' }] }) %>
+<%- include('../partials/app-header') %>
+
+<%
+  const formats = [
+    { value: 'webp', name: 'WebP', text: 'Best balance of size and speed. Works in every modern browser.' },
+    { value: 'avif', name: 'AVIF', text: 'Smallest files. Encoding is several times slower.' },
+    { value: 'jpeg', name: 'JPEG', text: 'Largest files, for systems that only accept JPEG.' },
+  ];
+  const fitHelp = {
+    inside: 'Fits inside the box, keeps the whole image',
+    cover: 'Fills the box exactly, crops the edges',
+    contain: 'Fits inside the box, pads the empty space',
+    outside: 'Covers the box, keeps the whole image',
+    fill: 'Stretches to the box, may distort',
+  };
+%>
+
+<form method="post" action="/apps/<%= app._id %>/settings" id="settings-form">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-head"><div><h2>General</h2><p>Name, upload limit and accepted files</p></div></div>
+      <div class="panel-body">
+        <div class="fields-2">
+          <div class="field">
+            <label for="name">App name</label>
+            <input id="name" name="name" type="text" maxlength="80" value="<%= app.name %>" required>
+          </div>
+          <div class="field">
+            <label for="maxUploadMB">Max upload size</label>
+            <div class="input-suffix">
+              <input id="maxUploadMB" name="maxUploadMB" type="number" min="1" max="<%= globalMaxMB %>" value="<%= app.maxUploadMB %>">
+              <span>MB</span>
+            </div>
+            <p class="hint">Up to <%= globalMaxMB %> MB, the server limit.</p>
+          </div>
+        </div>
+
+        <label class="switch mt-20">
+          <input type="checkbox" name="allowDocuments" <%= app.allowDocuments === false ? '' : 'checked' %>>
+          <span class="track"></span>
+          <span><strong>Accept documents</strong><small>PDF, Word, Excel, PowerPoint, CSV and text files, in both the current and the 97-2003 formats. Stored exactly as uploaded, with a preview in the library. Images are always accepted.</small></span>
+        </label>
+
+        <label class="switch mt-20">
+          <input type="checkbox" name="allowArchives" <%= app.allowArchives ? 'checked' : '' %>>
+          <span class="track"></span>
+          <span><strong>Accept ZIP archives</strong><small>Off by default. The bucket is public, so anything inside an archive can be downloaded by anyone holding the URL. The library lists the contents without ever unpacking them.</small></span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Storage</h2><p>Which bucket this app's files are written to</p></div>
+        <a class="btn btn-sm" href="/storage"><%- icon('database') %>Manage storage</a>
+      </div>
+      <div class="panel-body">
+        <% if (buckets.length === 0) { %>
+          <div class="alert alert-warning" role="alert">
+            <%- icon('alert') %>
+            <div><strong>No storage connected.</strong> Uploads for this app fail until a bucket is added. <a href="/storage/new">Connect one now</a>.</div>
+          </div>
+        <% } else { %>
+          <div class="field">
+            <label for="bucket">Bucket</label>
+            <select id="bucket" name="bucket">
+              <option value="" <%= app.bucket ? '' : 'selected' %>>Use the default storage<%= storageIsFallback && storageName ? ' (' + storageName + ')' : '' %></option>
+              <% buckets.forEach(function (b) { %>
+                <option value="<%= b._id %>" <%= String(app.bucket) === String(b._id) ? 'selected' : '' %> <%= b.active ? '' : 'disabled' %>>
+                  <%= b.name %> — <%= b.providerLabel %><%= b.isDefault ? ' (default)' : '' %><%= b.active ? '' : ' — off' %>
+                </option>
+              <% }) %>
+            </select>
+            <p class="hint">Changing this only affects new uploads. Files already stored stay where they are, with the same URLs.</p>
+          </div>
+
+          <% const chosen = buckets.find((b) => String(b._id) === String(app.bucket)) || buckets.find((b) => b.isDefault); %>
+          <% if (chosen && !chosen.supportsAcl && app.keepOriginal) { %>
+            <div class="alert alert-info mt-16" role="note">
+              <%- icon('info') %>
+              <div><strong><%= chosen.providerLabel %> has no per-object permissions.</strong> This app keeps original uploads, and on this provider they are as readable as the optimized sizes. Turn off "Keep the uploaded file" below, or use a bucket that supports ACLs.</div>
+            </div>
+          <% } %>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Output</h2><p>Format and compression of every generated size</p></div></div>
+      <div class="panel-body">
+        <span class="label">Format</span>
+        <div class="choice-cards">
+          <% formats.forEach(function (f) { %>
+            <label class="choice">
+              <input type="radio" name="format" value="<%= f.value %>" <%= app.format === f.value ? 'checked' : '' %>>
+              <span class="card">
+                <strong><%= f.name %><span class="check"><%- icon('check') %></span></strong>
+                <small><%= f.text %></small>
+              </span>
+            </label>
+          <% }) %>
+        </div>
+
+        <div class="field mt-20">
+          <label for="quality">Quality</label>
+          <div class="range-row">
+            <input id="quality" name="quality" type="range" min="30" max="100" step="1" value="<%= app.quality %>" data-range-output="quality-out">
+            <output id="quality-out" for="quality"><%= app.quality %></output>
+          </div>
+          <p class="hint">75 to 85 looks identical to the original for photos. AVIF uses a lower internal value automatically.</p>
+        </div>
+
+        <label class="switch mt-20">
+          <input type="checkbox" name="keepOriginal" <%= app.keepOriginal ? 'checked' : '' %>>
+          <span class="track"></span>
+          <span><strong>Keep the uploaded file</strong><small>Stores the original privately next to the sizes, as a backup. Uses more storage.</small></span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Sizes</h2><p>Every upload creates these versions. Up to 8, never upscaled.</p></div>
+        <button class="btn btn-sm" type="button" data-add-size><%- icon('plus') %>Add size</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table sizes-table">
+          <thead>
+            <tr><th class="col-name">Name</th><th class="col-num">Width</th><th class="col-num">Height</th><th class="col-fit">Fit</th><th class="col-x"></th></tr>
+          </thead>
+          <tbody data-sizes>
+            <% app.variants.forEach(function (v) { %>
+              <tr data-size-row>
+                <td><input type="text" name="v_name" value="<%= v.name %>" maxlength="20" pattern="[a-z0-9_\-]{1,20}" aria-label="Size name" required></td>
+                <td><div class="input-suffix"><input type="number" name="v_width" value="<%= v.width || '' %>" min="1" max="8000" placeholder="auto" aria-label="Width"><span>px</span></div></td>
+                <td><div class="input-suffix"><input type="number" name="v_height" value="<%= v.height || '' %>" min="1" max="8000" placeholder="auto" aria-label="Height"><span>px</span></div></td>
+                <td>
+                  <select name="v_fit" aria-label="Fit">
+                    <% fits.forEach(function (f) { %><option value="<%= f %>" <%= v.fit === f ? 'selected' : '' %>><%= f %></option><% }) %>
+                  </select>
+                </td>
+                <td><button class="icon-btn" type="button" data-remove-size aria-label="Remove size"><%- icon('trash') %></button></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-body">
+        <div class="fit-help">
+          <% fits.forEach(function (f) { %><div><strong><%= f %></strong><%= fitHelp[f] %></div><% }) %>
+        </div>
+      </div>
+      <template id="size-row-template">
+        <tr data-size-row>
+          <td><input type="text" name="v_name" maxlength="20" pattern="[a-z0-9_\-]{1,20}" placeholder="e.g. hero" aria-label="Size name" required></td>
+          <td><div class="input-suffix"><input type="number" name="v_width" min="1" max="8000" placeholder="auto" aria-label="Width"><span>px</span></div></td>
+          <td><div class="input-suffix"><input type="number" name="v_height" min="1" max="8000" placeholder="auto" aria-label="Height"><span>px</span></div></td>
+          <td>
+            <select name="v_fit" aria-label="Fit">
+              <% fits.forEach(function (f) { %><option value="<%= f %>" <%= f === 'inside' ? 'selected' : '' %>><%= f %></option><% }) %>
+            </select>
+          </td>
+          <td><button class="icon-btn" type="button" data-remove-size aria-label="Remove size"><%- icon('trash') %></button></td>
+        </tr>
+      </template>
+    </section>
+  </div>
+
+  <div class="save-bar">
+    <span class="muted">Changes apply to new uploads. Files already stored keep theirs and their URLs.</span>
+    <button class="btn btn-primary" type="submit"><%- icon('check') %>Save changes</button>
+  </div>
+</form>
+
+<section class="panel danger-zone mt-20">
+  <div class="panel-head"><div><h2>Danger zone</h2></div></div>
+  <div class="danger-row">
+    <div>
+      <strong><%= app.active ? 'Disable app' : 'Enable app' %></strong>
+      <p><%= app.active ? 'All requests with its keys are rejected. Images stay online.' : 'Its active keys start working again.' %></p>
+    </div>
+    <form method="post" action="/apps/<%= app._id %>/toggle" <%- app.active ? 'data-confirm="Disable this app? Every API request with its keys will fail."' : '' %>>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn <%= app.active ? 'btn-danger' : 'btn-primary' %>" type="submit"><%- icon('power') %><%= app.active ? 'Disable' : 'Enable' %></button>
+    </form>
+  </div>
+  <div class="danger-row">
+    <div>
+      <strong>Delete app</strong>
+      <% if (imageCount > 0) { %>
+        <p>Delete its <%= fmt.number(imageCount) %> <%= imageCount === 1 ? 'file' : 'files' %> in the media library first.</p>
+      <% } else { %>
+        <p>Removes the app and its keys. Type <code><%= app.slug %></code> to confirm.</p>
+      <% } %>
+    </div>
+    <% if (imageCount === 0) { %>
+      <form class="actions" method="post" action="/apps/<%= app._id %>/delete">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <input class="input-confirm" name="confirm" type="text" placeholder="<%= app.slug %>" autocomplete="off" aria-label="Type the folder name to confirm" required>
+        <button class="btn btn-danger" type="submit"><%- icon('trash') %>Delete</button>
+      </form>
+    <% } else { %>
+      <a class="btn" href="/library?app=<%= app._id %>">Open library</a>
+    <% } %>
+  </div>
+</section>
+
+<%- include('../partials/shell-end') %>

@@ -1,0 +1,55 @@
+<%- include('head') %>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="/"><%- include('brand') %><span><%= appName %><small>Image optimization</small></span></a>
+
+    <nav class="nav" aria-label="Main">
+      <a class="nav-item" href="/" <%- locals.section === 'dashboard' ? 'aria-current="page"' : '' %>><%- icon('dashboard') %><span>Dashboard</span></a>
+      <a class="nav-item" href="/library" <%- locals.section === 'library' ? 'aria-current="page"' : '' %>><%- icon('image') %><span>Media library</span></a>
+      <a class="nav-item" href="/apps" <%- locals.section === 'apps' && !locals.currentAppId ? 'aria-current="page"' : '' %>><%- icon('apps') %><span>Apps</span></a>
+      <a class="nav-item" href="/storage" <%- locals.section === 'storage' ? 'aria-current="page"' : '' %>><%- icon('database') %><span>Storage</span><% if (locals.storageCount === 0) { %><span class="dot warn" title="No storage connected"></span><% } %></a>
+    </nav>
+
+    <div class="nav-heading"><span>Your apps</span><a href="/apps?new=1" title="Create app" aria-label="Create app"><%- icon('plus') %></a></div>
+    <% if (navApps.length === 0) { %>
+      <div class="nav-empty">No apps yet</div>
+    <% } %>
+    <% navApps.forEach(function (a) { %>
+      <a class="nav-app" href="/apps/<%= a._id %>" <%- locals.section === 'apps' && locals.currentAppId === String(a._id) ? 'aria-current="page"' : '' %>>
+        <span class="avatar sm" style="--h: <%= fmt.hue(a.slug) %>"><%= fmt.initials(a.name) %></span>
+        <span class="name"><%= a.name %></span>
+        <span class="dot <%= a.active ? '' : 'off' %>" title="<%= a.active ? 'Active' : 'Disabled' %>"></span>
+      </a>
+    <% }) %>
+
+    <div class="sidebar-foot">
+      <div class="account">
+        <span class="avatar round"><%= admin.email.charAt(0).toUpperCase() %></span>
+        <div class="account-text"><div class="account-email"><%= admin.email %></div><div class="account-role">Administrator</div></div>
+      </div>
+      <form method="post" action="/logout">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="nav-item" type="submit"><%- icon('logout') %><span>Sign out</span></button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" type="button" data-toggle-sidebar aria-label="Open menu"><%- icon('menu') %></button>
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <% (locals.crumbs || []).forEach(function (c, i, all) { %>
+          <% if (i > 0) { %><%- icon('chevronRight') %><% } %>
+          <% if (c.href && i < all.length - 1) { %><a href="<%= c.href %>"><%= c.label %></a><% } else { %><span><%= c.label %></span><% } %>
+        <% }) %>
+      </nav>
+      <form class="search" action="/library" method="get" role="search">
+        <%- icon('search') %>
+        <% if (locals.currentAppId && locals.section === 'library') { %><input type="hidden" name="app" value="<%= currentAppId %>"><% } %>
+        <input type="search" name="q" placeholder="Search files by name or ref" value="<%= locals.searchQuery || '' %>" aria-label="Search files">
+      </form>
+      <button class="btn btn-primary btn-upload" type="button" data-open-dialog="upload-dialog" <%= navApps.length ? '' : 'disabled' %>><%- icon('upload') %><span>Upload</span></button>
+    </header>
+
+    <main class="content">

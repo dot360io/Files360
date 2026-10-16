@@ -1,0 +1,88 @@
+<%- include('../partials/shell-start', { crumbs: [{ label: 'Apps', href: '/apps' }, { label: app.name, href: '/apps/' + app._id }, { label: 'Integration' }] }) %>
+<%- include('../partials/app-header') %>
+
+<%
+  const node = "const form = new FormData();\nform.append('file', new Blob([buffer]), 'photo.jpg');\nform.append('folder', 'products');\n\nconst res = await fetch(process.env.FILES360_API_URL + '/v1/images', {\n  method: 'POST',\n  headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },\n  body: form,\n});\nconst image = await res.json();\n// image.variants." + app.variants[app.variants.length - 1].name + ".url";
+  const env = 'FILES360_API_URL=' + publicUrl + '\nFILES360_API_KEY=img_...';
+%>
+
+<div class="grid-2-1">
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-head"><div><h2>Connection details</h2><p>What a developer needs to connect this app</p></div></div>
+      <div class="panel-body">
+        <div class="field">
+          <label for="api-url">API base URL</label>
+          <div class="input-group">
+            <input id="api-url" type="text" value="<%= publicUrl %>/v1" readonly>
+            <button class="btn" type="button" data-copy="<%= publicUrl %>/v1"><%- icon('copy') %>Copy</button>
+          </div>
+        </div>
+        <div class="fields-2">
+          <div class="field">
+            <label for="api-folder">Folder</label>
+            <div class="input-group">
+              <input id="api-folder" type="text" value="<%= app.slug %>" readonly>
+              <button class="btn" type="button" data-copy="<%= app.slug %>" aria-label="Copy folder"><%- icon('copy') %></button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="api-auth">Auth header</label>
+            <div class="input-group">
+              <input id="api-auth" type="text" value="Authorization: Bearer &lt;key&gt;" readonly>
+              <a class="btn" href="/apps/<%= app._id %>/keys" aria-label="Manage keys"><%- icon('key') %></a>
+            </div>
+          </div>
+        </div>
+        <span class="label">Environment variables</span>
+        <div class="code-block"><pre><%= env %></pre><button class="btn" type="button" data-copy="<%= env %>">Copy</button></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Upload from Node.js</h2><p>Node 20 or newer, no extra packages</p></div></div>
+      <div class="panel-body">
+        <div class="code-block"><pre><%= node %></pre><button class="btn" type="button" data-copy="<%= node %>">Copy</button></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-head"><div><h2>Integration guide</h2><p>Markdown file for developers</p></div></div>
+      <div class="panel-body">
+        <p class="muted">Includes this app's folder, sizes and limits, every endpoint, error codes, and examples for Node.js, Express, PHP and HTML. It never contains a key.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/apps/<%= app._id %>/integration/download"><%- icon('download') %>Download .md</a>
+          <button class="btn" type="button" data-copy="<%= markdown %>"><%- icon('copy') %>Copy markdown</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Endpoints</h2></div></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <tbody>
+            <tr><td><span class="badge">GET</span></td><td><code>/v1/me</code></td></tr>
+            <tr><td><span class="badge">POST</span></td><td><code>/v1/images</code></td></tr>
+            <tr><td><span class="badge">POST</span></td><td><code>/v1/images/from-url</code></td></tr>
+            <tr><td><span class="badge">GET</span></td><td><code>/v1/images</code></td></tr>
+            <tr><td><span class="badge">GET</span></td><td><code>/v1/images/:id</code></td></tr>
+            <tr><td><span class="badge">DELETE</span></td><td><code>/v1/images/:id</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-foot"><span class="muted">Rate limit: <%= rate %> requests per minute</span></div>
+    </section>
+  </div>
+</div>
+
+<section class="panel mt-20">
+  <div class="panel-head"><div><h2>Guide preview</h2><p><%= app.slug %>-image-api.md</p></div></div>
+  <div class="panel-body doc-preview">
+    <div class="code-block"><pre><%= markdown %></pre></div>
+  </div>
+</section>
+
+<%- include('../partials/shell-end') %>

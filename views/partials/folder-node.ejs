@@ -1,0 +1,16 @@
+<%
+  const href = '/library?app=' + appId + '&folder=' + encodeURIComponent(node.path);
+  const isCurrent = currentAppKey === appId && currentFolder === node.path;
+%>
+<li>
+  <a class="folder-item" style="--depth: <%= depth %>" href="<%= href %>" <%- isCurrent ? 'aria-current="page"' : '' %>>
+    <%- icon('folder') %><span class="name"><%= node.name %></span><span class="count"><%= fmt.number(node.total) %></span>
+  </a>
+  <% if (node.children.length && currentAppKey === appId && (currentFolder === node.path || currentFolder.startsWith(node.path + '/'))) { %>
+    <ul>
+      <% node.children.forEach(function (child) { %>
+        <%- include('folder-node', { node: child, depth: depth + 1 }) %>
+      <% }) %>
+    </ul>
+  <% } %>
+</li>

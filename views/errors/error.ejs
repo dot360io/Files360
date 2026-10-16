@@ -1,0 +1,17 @@
+<% if (locals.admin && locals.navApps) { %>
+  <%- include('../partials/shell-start', { crumbs: [{ label: 'Error' }] }) %>
+<% } else { %>
+  <%- include('../partials/head') %>
+  <body><main class="content">
+<% } %>
+<div class="panel error-page">
+  <div class="code"><%= status %></div>
+  <h1 class="error-title"><%= status === 404 ? 'Not found' : 'Something went wrong' %></h1>
+  <p class="muted"><%= message %></p>
+  <a class="btn btn-primary" href="/">Go to dashboard</a>
+</div>
+<% if (locals.admin && locals.navApps) { %>
+  <%- include('../partials/shell-end') %>
+<% } else { %>
+  </main></body></html>
+<% } %>

@@ -1,0 +1,54 @@
+<%
+  const accept = [
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/tiff', 'image/svg+xml', '.svg',
+    'application/pdf', '.pdf',
+    'text/csv', '.csv', 'text/plain', '.txt',
+    '.xlsx', '.xls', '.docx', '.doc', '.pptx', '.ppt', '.zip',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-powerpoint', 'application/zip',
+  ].join(',');
+%>
+<dialog class="modal" id="upload-dialog" data-csrf="<%= csrf %>" aria-labelledby="upload-title">
+  <div class="modal-head">
+    <div>
+      <h2 id="upload-title">Upload files</h2>
+      <p>Images are resized to the app's sizes. Documents are stored as they are.</p>
+    </div>
+    <button class="icon-btn" type="button" data-close-dialog aria-label="Close"><%- icon('x') %></button>
+  </div>
+  <div class="modal-body">
+    <% if (navApps.length === 0) { %>
+      <div class="alert alert-info"><%- icon('info') %><div>Create an app first. Uploads are stored in an app's folder.</div></div>
+    <% } else { %>
+      <div class="fields-2">
+        <div class="field">
+          <label for="upload-app">App</label>
+          <select id="upload-app">
+            <% navApps.forEach(function (a) { %>
+              <option value="<%= a._id %>" data-max="<%= a.maxUploadMB %>" data-docs="<%= a.allowDocuments === false ? '0' : '1' %>" data-archives="<%= a.allowArchives ? '1' : '0' %>" <%= locals.currentAppId === String(a._id) ? 'selected' : '' %> <%= a.active ? '' : 'disabled' %>><%= a.name %><%= a.active ? '' : ' (disabled)' %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="upload-folder">Folder <span class="muted">(optional)</span></label>
+          <input id="upload-folder" type="text" placeholder="e.g. products/2026" value="<%= locals.currentFolder || '' %>" autocomplete="off">
+        </div>
+      </div>
+      <label class="drop" id="upload-drop" for="upload-input">
+        <span class="drop-icon"><%- icon('cloudUp') %></span>
+        <span class="drop-title">Drag and drop files here</span>
+        <span class="drop-sub">or <u>browse files</u>. <span data-accept-label>Images, PDF, Office files, CSV and text</span> up to <span data-max-label>15</span> MB each</span>
+        <input class="visually-hidden" id="upload-input" type="file" multiple accept="<%= accept %>">
+      </label>
+      <ul class="upload-queue" id="upload-queue" aria-live="polite"></ul>
+    <% } %>
+  </div>
+  <div class="modal-foot">
+    <span class="muted" id="upload-summary"></span>
+    <div class="actions">
+      <button class="btn" type="button" data-close-dialog data-upload-done>Done</button>
+    </div>
+  </div>
+</dialog>

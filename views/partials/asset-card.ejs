@@ -1,0 +1,38 @@
+<%
+  const isDoc = fmt.isDocument(image);
+  const doc = isDoc ? fmt.documentType(image.input.format) : null;
+  const thumb = fmt.assetThumb(image);
+  const url = fmt.assetUrl(image);
+  const selectable = locals.selectable === true;
+%>
+<article class="asset" data-asset>
+  <% if (selectable) { %>
+    <label class="asset-check" title="Select">
+      <input type="checkbox" name="ids" value="<%= image._id %>" form="bulk-form" data-select>
+      <span class="checkbox-ui"><%- icon('check') %></span>
+    </label>
+  <% } %>
+  <% if (url) { %>
+    <button class="icon-btn asset-copy" type="button" data-copy="<%= url %>" title="Copy URL" aria-label="Copy URL"><%- icon('copy') %></button>
+  <% } %>
+  <a class="asset-link" href="/library/<%= image._id %>">
+    <div class="asset-thumb <%= isDoc ? 'file-tile tone-' + doc.tone : 'checker' %>">
+      <% if (isDoc) { %>
+        <span class="file-glyph"><%- icon(doc.icon) %></span>
+      <% } else if (thumb) { %>
+        <img src="<%= thumb.url %>" alt="" loading="lazy" decoding="async">
+      <% } %>
+      <span class="badge"><%= fmt.assetBadge(image) %></span>
+    </div>
+    <div class="asset-info">
+      <div class="asset-name" title="<%= image.originalName || 'Untitled' %>"><%= image.originalName || 'Untitled' %></div>
+      <div class="asset-meta">
+        <span><%= fmt.assetDetail(image) %></span>
+        <span><%= fmt.bytes(image.bytesOut) %></span>
+      </div>
+      <% if (locals.showWhere && image.app) { %>
+        <div class="asset-where"><%= image.app.slug %>/<%= image.folder %></div>
+      <% } %>
+    </div>
+  </a>
+</article>

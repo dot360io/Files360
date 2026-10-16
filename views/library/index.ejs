@@ -1,0 +1,169 @@
+<%
+  const crumbs = [{ label: 'Media library', href: '/library' }];
+  if (currentApp) {
+    crumbs.push({ label: currentApp.name, href: '/library?app=' + currentApp.app._id });
+    if (folder) {
+      folder.split('/').forEach(function (part, i, parts) {
+        crumbs.push({ label: part, href: '/library?app=' + currentApp.app._id + '&folder=' + encodeURIComponent(parts.slice(0, i + 1).join('/')) });
+      });
+    }
+  }
+  const heading = currentApp ? (folder ? folder.split('/').pop() : currentApp.name) : 'All files';
+  const allTotal = tree.reduce(function (s, t) { return s + t.total; }, 0);
+%>
+<%- include('../partials/shell-start', { crumbs: crumbs }) %>
+
+<div class="library">
+  <aside class="panel folders" aria-label="Folders">
+    <div class="folders-title">Folders</div>
+    <ul class="folder-tree">
+      <li>
+        <a class="folder-item" href="/library" <%- !currentApp ? 'aria-current="page"' : '' %>><%- icon('layers') %><span class="name">All files</span><span class="count"><%= fmt.number(allTotal) %></span></a>
+      </li>
+    </ul>
+    <div class="folder-sep"></div>
+    <ul class="folder-tree">
+      <% tree.forEach(function (branch) {
+           const appId = String(branch.app._id);
+           const isApp = currentApp && String(currentApp.app._id) === appId; %>
+        <li>
+          <a class="folder-item" href="/library?app=<%= appId %>" <%- isApp && !folder ? 'aria-current="page"' : '' %>>
+            <span class="avatar sm" style="--h: <%= fmt.hue(branch.app.slug) %>"><%= fmt.initials(branch.name) %></span>
+            <span class="name"><%= branch.name %></span><span class="count"><%= fmt.number(branch.total) %></span>
+          </a>
+          <% if (isApp && branch.children.length) { %>
+            <ul>
+              <% branch.children.forEach(function (child) { %>
+                <%- include('../partials/folder-node', { node: child, depth: 1, appId: appId, currentAppKey: appId, currentFolder: folder }) %>
+              <% }) %>
+            </ul>
+          <% } %>
+        </li>
+      <% }) %>
+      <% if (tree.length === 0) { %><li class="nav-empty muted">Create an app to start</li><% } %>
+    </ul>
+  </aside>
+
+  <section>
+    <div class="toolbar">
+      <div>
+        <h1><%= heading %></h1>
+        <div class="sub num"><%= fmt.number(total) %> <%= total === 1 ? 'file' : 'files' %><%= currentApp && folder ? ' in ' + currentApp.app.slug + '/' + folder : '' %></div>
+      </div>
+      <div class="toolbar-actions">
+        <form method="get" action="/library">
+          <% if (currentApp) { %><input type="hidden" name="app" value="<%= currentApp.app._id %>"><% } %>
+          <% if (folder) { %><input type="hidden" name="folder" value="<%= folder %>"><% } %>
+          <% if (q) { %><input type="hidden" name="q" value="<%= q %>"><% } %>
+          <% if (view === 'list') { %><input type="hidden" name="view" value="list"><% } %>
+          <label class="visually-hidden" for="sort">Sort</label>
+          <select id="sort" name="sort" data-autosubmit>
+            <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest first</option>
+            <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest first</option>
+            <option value="largest" <%= sort === 'largest' ? 'selected' : '' %>>Largest upload</option>
+            <option value="name" <%= sort === 'name' ? 'selected' : '' %>>Name</option>
+          </select>
+        </form>
+        <div class="segmented" role="group" aria-label="View">
+          <a href="<%= buildUrl({ view: undefined, page: undefined }) %>" aria-current="<%= view === 'grid' %>" title="Grid"><%- icon('grid') %></a>
+          <a href="<%= buildUrl({ view: 'list', page: undefined }) %>" aria-current="<%= view === 'list' %>" title="List"><%- icon('list') %></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="bulk-bar" id="bulk-bar" hidden>
+      <span class="count" data-selected-count>0 selected</span>
+      <button class="btn btn-sm btn-ghost" type="button" data-select-all>Select all on page</button>
+      <button class="btn btn-sm btn-ghost" type="button" data-clear-selection>Clear</button>
+      <form id="bulk-form" method="post" action="/library/bulk-delete" data-confirm="Delete the selected files and every size generated from them?">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <input type="hidden" name="returnTo" value="<%= returnTo %>">
+        <button class="btn btn-sm btn-danger" type="submit"><%- icon('trash') %>Delete</button>
+      </form>
+    </div>
+
+    <% if (q) { %>
+      <div class="search-note">
+        <%- icon('search') %><span>Results for <strong><%= q %></strong></span>
+        <a class="btn btn-sm btn-ghost" href="<%= buildUrl({ q: undefined, page: undefined }) %>">Clear search</a>
+      </div>
+    <% } %>
+
+    <% if (subfolders.length) { %>
+      <div class="folder-tiles">
+        <% subfolders.forEach(function (sub) { %>
+          <a class="panel folder-tile" href="/library?app=<%= currentApp.app._id %>&folder=<%= encodeURIComponent(sub.path) %>">
+            <span class="folder-icon"><%- icon('folder') %></span>
+            <div><strong><%= sub.name %></strong><small><%= fmt.number(sub.total) %> <%= sub.total === 1 ? 'file' : 'files' %></small></div>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
+
+    <% if (images.length === 0) { %>
+      <div class="panel empty-state">
+        <div class="empty-icon"><%- icon(q ? 'search' : 'cloudUp') %></div>
+        <% if (q) { %>
+          <h2>No files match "<%= q %>"</h2>
+          <p>Search looks at file names and refs. Try a shorter term.</p>
+        <% } else { %>
+          <h2>Nothing here yet</h2>
+          <p>Drop images or documents into the upload dialog, or send them through the API with this <%= folder ? 'folder' : 'app' %>.</p>
+          <button class="btn btn-primary" type="button" data-open-dialog="upload-dialog" <%= navApps.length ? '' : 'disabled' %>><%- icon('upload') %>Upload files</button>
+        <% } %>
+      </div>
+    <% } else if (view === 'grid') { %>
+      <div class="asset-grid">
+        <% images.forEach(function (image) { %>
+          <%- include('../partials/asset-card', { image: image, selectable: true, showWhere: !currentApp }) %>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="panel table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th><label class="list-check" title="Select all"><input type="checkbox" data-select-all-toggle><span class="checkbox-ui"><%- icon('check') %></span></label></th>
+              <th>Name</th><th>Location</th><th class="right">Contents</th><th class="right">Uploaded</th><th class="right">Stored</th><th>Added</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% images.forEach(function (image) {
+                 const isDoc = fmt.isDocument(image);
+                 const doc = isDoc ? fmt.documentType(image.input.format) : null;
+                 const thumb = fmt.assetThumb(image);
+                 const url = fmt.assetUrl(image); %>
+              <tr data-asset>
+                <td><label class="list-check"><input type="checkbox" name="ids" value="<%= image._id %>" form="bulk-form" data-select><span class="checkbox-ui"><%- icon('check') %></span></label></td>
+                <td>
+                  <a class="cell-main" href="/library/<%= image._id %>">
+                    <span class="cell-thumb <%= isDoc ? 'file-tile tone-' + doc.tone : 'checker' %>"><% if (isDoc) { %><%- icon(doc.icon) %><% } else if (thumb) { %><img src="<%= thumb.url %>" alt="" loading="lazy"><% } %></span>
+                    <strong><%= image.originalName || 'Untitled' %></strong>
+                  </a>
+                </td>
+                <td class="muted"><%= image.app ? image.app.slug : '' %>/<%= image.folder %></td>
+                <td class="right num"><%= fmt.assetDetail(image) %></td>
+                <td class="right num"><%= fmt.bytes(image.input.bytes) %></td>
+                <td class="right num"><%= fmt.bytes(image.bytesOut) %></td>
+                <td class="muted" title="<%= fmt.date(image.createdAt) %>"><%= fmt.ago(image.createdAt) %></td>
+                <td class="right"><% if (url) { %><button class="icon-btn" type="button" data-copy="<%= url %>" title="Copy URL" aria-label="Copy URL"><%- icon('copy') %></button><% } %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <% if (pages > 1) { %>
+      <nav class="pager" aria-label="Pages">
+        <span class="num">Page <%= page %> of <%= pages %></span>
+        <div class="actions">
+          <% if (page > 1) { %><a class="btn btn-sm" href="<%= buildUrl({ page: page - 1 }) %>">Previous</a><% } %>
+          <% if (page < pages) { %><a class="btn btn-sm" href="<%= buildUrl({ page: page + 1 }) %>">Next</a><% } %>
+        </div>
+      </nav>
+    <% } %>
+  </section>
+</div>
+
+<%- include('../partials/shell-end') %>

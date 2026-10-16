@@ -1,0 +1,15 @@
+    </main>
+  </div>
+</div>
+
+<%- include('upload-dialog') %>
+
+<% if (locals.flash) { %>
+  <div class="toast <%= flash.type === 'error' ? 'error' : '' %>" role="status" data-toast>
+    <%- icon(flash.type === 'error' ? 'alert' : 'check') %>
+    <p><%= flash.msg %></p>
+    <button class="icon-btn" type="button" data-dismiss-toast aria-label="Dismiss"><%- icon('x') %></button>
+  </div>
+<% } %>
+</body>
+</html>
