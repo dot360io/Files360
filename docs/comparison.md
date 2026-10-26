@@ -128,6 +128,8 @@ predictable costs at your storage provider's rates, document previews alongside
 images, and no per-transformation billing. In return you give up on-request
 transforms and run the service yourself.
 
+*Cloudinary, imgix and Uploadcare are trademarks of their owners. Files360 is not affiliated with or endorsed by them; they are named only to compare publicly listed features and prices.*
+
 ## Sources
 
 All checked 2026-10-16 unless noted.
