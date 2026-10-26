@@ -21,7 +21,7 @@ Everything that has to happen outside the code to publish Files360, in order. Th
 ## 3. Before tagging v1.0.0
 
 - [ ] CI green on `main`: Node 20/22/24, Postgres, MySQL, Docker boot, docs, MCP, audit.
-- [ ] Re-check the Hetzner CAX11 price in `docs/comparison.md` by hand (the research could only confirm it from secondary sources).
+- [x] Re-check the Hetzner CAX11 price in `docs/comparison.md` by hand (the research could only confirm it from secondary sources).
 - [ ] Screenshots of the library, a document preview and the settings page, and a 60-second GIF of the upload dialog: `docs/public/demo.gif`, then replace the TODO comment at the top of README.md.
 - [ ] GitHub Sponsors and Buy Me a Coffee: create the accounts, then add `.github/FUNDING.yml` and a Sponsor line at the end of README.md.
 - [ ] Referral links, if you join any programmes: fill `referral` in `utils/providers.js` and run `npm run docs:generate`. The disclosure sentence appears in the README by itself once one is set.

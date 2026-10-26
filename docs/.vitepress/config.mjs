@@ -17,7 +17,8 @@ const jsonLd = {
   license: 'https://www.gnu.org/licenses/agpl-3.0.html',
   isAccessibleForFree: true,
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-  author: { '@type': 'Organization', name: 'Dot360', url: 'https://github.com/dot360io' },
+  author: { '@type': 'Organization', name: 'Dot360', url: 'https://dot360.io' },
+  publisher: { '@type': 'Organization', name: 'Dot360', url: 'https://dot360.io' },
   keywords: 'cloudinary alternative, self-hosted, image optimization, digital asset management, s3, file upload api',
 };
 
@@ -44,6 +45,7 @@ export default defineConfig({
       { text: 'API', link: '/api' },
       { text: 'Compare', link: '/comparison' },
       { text: 'Blog', link: '/blog/hostile-uploads' },
+      { text: 'by Dot360', link: 'https://dot360.io' },
     ],
     sidebar: [
       {
@@ -73,6 +75,9 @@ export default defineConfig({
     socialLinks: [{ icon: 'github', link: 'https://github.com/dot360io/Files360' }],
     editLink: { pattern: 'https://github.com/dot360io/Files360/edit/main/docs/:path', text: 'Edit this page' },
     search: { provider: 'local' },
-    footer: { message: 'Released under the AGPL-3.0 licence.', copyright: 'Dot360' },
+    footer: {
+      message: 'Released under the AGPL-3.0 licence.',
+      copyright: 'Built and maintained by <a href="https://dot360.io">Dot360</a>, a custom software studio.',
+    },
   },
 });

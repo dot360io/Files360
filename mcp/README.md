@@ -128,4 +128,4 @@ FILES360_API_URL=https://files.example.com FILES360_API_KEY=f360_... \
 
 ## Licence
 
-AGPL-3.0, copyright Dot360. Source at [github.com/dot360io/Files360](https://github.com/dot360io/Files360).
+AGPL-3.0, copyright [Dot360](https://dot360.io). Source at [github.com/dot360io/Files360](https://github.com/dot360io/Files360).

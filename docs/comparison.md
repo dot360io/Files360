@@ -53,15 +53,18 @@ Assumptions:
 - Delivered bytes are the same for every option, because all of them serve WebP or
   AVIF.
 
-**Files360 on Hetzner.** CAX11 (2 Arm vCPU, 4 GB RAM, 40 GB disk, 20 TB traffic):
+**Files360 on Hetzner.** CX23 (2 Intel/AMD vCPU, 4 GB RAM, 40 GB disk, 20 TB traffic):
 €5.99, plus €0.50 for an IPv4 address. The bucket costs €6.49, and 50 GB stored and
 500 GB egress both fit inside its 1 TB allowances.
-**Total: €12.98/month excluding VAT.** Two caveats:
+**Total: €12.98/month excluding VAT.** On the Arm CAX11 (same size, €6.49) it is
+€13.48. Three caveats:
 - A Hetzner bucket sits in one EU region with no CDN in front. Adding one costs extra.
-- 20,000 uploads is about 670 a day. That is comfortable for a CAX11 with two sharp
-  jobs. AVIF on Arm is several times slower than WebP.
+- 20,000 uploads is about 670 a day. That is comfortable for either server with two
+  sharp jobs. AVIF is several times slower than WebP, more so on Arm.
+- Hetzner sometimes shows a server type as not available in a location. Pick another
+  location or the other type; the Docker image runs on both.
 
-**Files360 with Cloudflare R2.** The CAX11 costs €6.49 as above. R2 storage is
+**Files360 with Cloudflare R2.** The CX23 with IPv4 costs €6.49 as above. R2 storage is
 (50 − 10 free) × $0.015 = $0.60. Writes are 20,000 × 4 objects = 80,000 Class A
 requests, inside the free million. Reads at an average of about 100 KB per image are
 5 million Class B requests, inside the free 10 million.
@@ -146,10 +149,8 @@ All checked 2026-10-16 unless noted.
 - Hetzner Object Storage price and allowances, read from the page's embedded price
   calculator data: https://www.hetzner.com/storage/object-storage/
 - Hetzner Object Storage billing rules: https://docs.hetzner.com/storage/object-storage/overview/
-- Hetzner CAX11 at €5.99 + €0.50 IPv4. Hetzner's own page loads prices with a
-  script, so this comes from secondary sources: https://kimmo.suominen.com/stuff/cpc-2026-08.txt
-  (retrieved early August 2026) and
-  https://privatedevops.com/news/hetzner-june-2026-cloud-price-increase-what-to-do
-  (€4.49 → €5.99 from 2026-06-15). Confirm at https://www.hetzner.com/cloud/cost-optimized/
+- Hetzner Cloud server prices checked by hand on 2026-10-26 at
+  https://www.hetzner.com/cloud/: CX23 €5.99/month and CAX11 €6.49/month, each
+  plus €0.50/month for a primary IPv4 address.
 - Cloudflare R2: https://developers.cloudflare.com/r2/pricing/
 - Backblaze B2: https://www.backblaze.com/cloud-storage/pricing

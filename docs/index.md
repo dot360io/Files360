@@ -31,6 +31,10 @@ features:
     details: SVG allowlist, pixel limits, capped hand-written parsers, SSRF-guarded imports and a setup wizard locked behind a one-time token.
 ---
 
+## Who is behind it
+
+Files360 is built and maintained by [Dot360](https://dot360.io), a custom software studio. It started as the upload service behind our own products and is now open source under the AGPL. Issues and pull requests are answered by the people who write it. If you want help running Files360 or building on top of it, [talk to us](https://dot360.io).
+
 ## What it is not
 
 Files360 does not transcode video, tag or moderate images with AI, act as an object store itself, or run as a hosted service. It does not edit images in the browser. On-the-fly transformation URLs are on the [roadmap](https://github.com/dot360io/Files360/blob/main/PLAN.md); today you configure named sizes per app.

@@ -4,7 +4,10 @@
   "private": true,
   "description": "Self-hosted upload API and media library. Images are optimized into the sizes you configure, documents are stored with a preview, and everything lands on your own S3-compatible bucket as CDN URLs.",
   "license": "AGPL-3.0-only",
-  "author": "Dot360",
+  "author": {
+    "name": "Dot360",
+    "url": "https://dot360.io"
+  },
   "homepage": "https://files360.dev",
   "repository": {
     "type": "git",

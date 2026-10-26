@@ -187,7 +187,7 @@ real build and boots the image into the wizard.*
       command to apply them once the repository exists.
 - [x] **Comparison table** against Cloudinary, imgix and Uploadcare in
       `docs/comparison.md`, with sources checked on 2026-10-16 and the rows where the
-      hosted services win. *Re-check the Hetzner CAX11 price by hand.*
+      hosted services win. Hetzner server prices re-checked by hand on 2026-10-26.
 - [x] **`scripts/import-from-cloudinary.js`**: resumable, re-runnable, writes a
       `cloudinary-map.csv` for rewriting URLs. Not yet run against a real account.
 - [x] "Migrating from Cloudinary" docs page mapping their transformations onto

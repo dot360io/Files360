@@ -21,7 +21,10 @@
     "url": "https://github.com/dot360io/Files360/issues"
   },
   "license": "AGPL-3.0-only",
-  "author": "Dot360",
+  "author": {
+    "name": "Dot360",
+    "url": "https://dot360.io"
+  },
   "type": "commonjs",
   "main": "src/server.js",
   "bin": {

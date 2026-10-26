@@ -5,7 +5,7 @@ description: How Files360 accepts PDFs, Office files, ZIPs and SVG from the inte
 
 # Parsing hostile uploads without a parser library
 
-*Dot360 · October 2026*
+*[Dot360](https://dot360.io) · October 2026*
 
 An upload endpoint is a parser exposed to the internet. Whatever arrives at `POST /v1/files` was chosen by someone else, and Files360 does more with it than store it: it decides what it is, renders images, and reads a preview out of documents so the media library can show the first rows of a spreadsheet without downloading it again. This post is about how that is done safely, and why the reading is done by about 900 lines of code in the repository rather than by a library.
 

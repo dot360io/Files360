@@ -4,6 +4,8 @@
 
 **Self-hosted image and file API. Upload once, get optimized CDN URLs, keep everything on your own bucket.**
 
+Built and maintained by [Dot360](https://dot360.io)
+
 [![CI](https://github.com/dot360io/Files360/actions/workflows/ci.yml/badge.svg)](https://github.com/dot360io/Files360/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/tag/dot360io/Files360?sort=semver&label=release&color=3448c5)](https://github.com/dot360io/Files360/releases) [![Licence](https://img.shields.io/github/license/dot360io/Files360?label=licence&color=blue)](LICENSE) [![Docker](https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64-2496ED?logo=docker&logoColor=white)](https://github.com/dot360io/Files360/pkgs/container/files360) [![Node](https://img.shields.io/badge/node-%E2%89%A520.9-339933?logo=nodedotjs&logoColor=white)](package.json) [![Docs](https://img.shields.io/badge/docs-files360.dev-3448c5)](https://files360.dev) [![MCP server](https://img.shields.io/badge/MCP-server-8A2BE2)](mcp/README.md)
 
 [Docs](https://files360.dev) · [Install](https://files360.dev/install) · [API](https://files360.dev/api) · [Compare](https://files360.dev/comparison) · [Roadmap](PLAN.md)
@@ -94,7 +96,7 @@ Hosted media services are excellent at some things. Here is the honest version:
 | Video, AI tagging | no | **yes** | partly | **yes** |
 | CDN and ops included | no, you run it | **yes** | **yes** | **yes** |
 
-**Example workload:** 50 GB stored, 500 GB delivered and 20k uploads a month comes to **about €13/month** on a Hetzner Arm server and bucket, against **$249/month** on Cloudinary Advanced. Prices were checked on 2026-10-16, and the [full comparison](https://files360.dev/comparison) shows the sources and the arithmetic.
+**Example workload:** 50 GB stored, 500 GB delivered and 20k uploads a month comes to **about €13/month** on a small Hetzner server (CX23) and bucket, against **$249/month** on Cloudinary Advanced. Prices were checked on 2026-10-16, and the [full comparison](https://files360.dev/comparison) shows the sources and the arithmetic.
 
 <sub>Cloudinary, imgix and Uploadcare are trademarks of their owners. Files360 is not affiliated with or endorsed by them; they are named only to compare publicly listed features and prices.</sub>
 
@@ -216,7 +218,9 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) and [ARCHITECTURE.md](ARCHITECTURE.md) f
 
 ## Licence
 
-[AGPL-3.0](LICENSE) © Dot360
+[AGPL-3.0](LICENSE) © [Dot360](https://dot360.io)
+
+Files360 is built and maintained by [Dot360](https://dot360.io), a custom software studio. It started as the upload service behind our own products. Need help running it or building on it? [Get in touch](https://dot360.io).
 
 <div align="center">
 
