@@ -32,7 +32,7 @@ Everything that has to happen outside the code to publish Files360, in order. Th
 - [ ] `git tag -s v1.0.0 -m "Files360 1.0.0" && git push origin v1.0.0`. The `Docker image` workflow publishes `ghcr.io/dot360io/files360:1.0.0`, `:1.0` and `:latest` for amd64 and arm64.
 - [ ] Packages → files360 → Package settings: change visibility to **Public** (GHCR packages start private).
 - [ ] Releases → Draft a new release from the tag, body from CHANGELOG.md, attach the demo GIF.
-- [ ] `cd mcp && npm publish` (check the name `files360-mcp` is still free with `npm view files360-mcp` first; publish from an npm account owned by Dot360 with 2FA on).
+- [x] `cd mcp && npm publish` (check the name `files360-mcp` is still free with `npm view files360-mcp` first; publish from an npm account owned by Dot360 with 2FA on).
 
 ## 5. Tell people
 
