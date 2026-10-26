@@ -1,6 +1,6 @@
 {
   "name": "files360-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "MCP server for Files360: lets an AI agent upload images and documents to your own Files360 instance and get CDN URLs back.",
   "keywords": [
     "mcp",
