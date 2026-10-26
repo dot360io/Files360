@@ -1,5 +1,4 @@
-const App = require('../models/App');
-const Image = require('../models/Image');
+const db = require('../db');
 const storage = require('./storage');
 const optimizer = require('./optimizer');
 const documents = require('./documents');
@@ -179,7 +178,7 @@ async function ingest({ app, buffer, originalName, mimetype, folder = '', ref, s
   }
 
   const hash = sha256(buffer);
-  const existing = await Image.findOne({ app: app._id, folder, hash });
+  const existing = await db.assets.findDuplicate(app._id, folder, hash);
   if (existing) return { image: existing, duplicate: true };
 
   const target = await storage.forApp(app);
@@ -189,8 +188,8 @@ async function ingest({ app, buffer, originalName, mimetype, folder = '', ref, s
 
   let image;
   try {
-    image = await Image.create({
-      app: app._id,
+    image = await db.assets.create({
+      appId: app._id,
       bucket: target._id,
       folder,
       hash,
@@ -202,17 +201,14 @@ async function ingest({ app, buffer, originalName, mimetype, folder = '', ref, s
     });
   } catch (err) {
     // Two identical uploads at the same moment: return the one that won
-    if (err.code === 11000) {
-      const winner = await Image.findOne({ app: app._id, folder, hash });
+    if (db.isUniqueViolation(err)) {
+      const winner = await db.assets.findDuplicate(app._id, folder, hash);
       if (winner) return { image: winner, duplicate: true };
     }
     throw err;
   }
 
-  await App.updateOne(
-    { _id: app._id },
-    { $inc: { 'stats.images': 1, 'stats.bytesIn': buffer.length, 'stats.bytesOut': stored.bytesOut } }
-  );
+  await db.apps.addStats(app._id, { images: 1, bytesIn: buffer.length, bytesOut: stored.bytesOut });
 
   return { image, duplicate: false };
 }
@@ -228,18 +224,15 @@ function keysOf(image) {
 async function removeImage(image) {
   await storage.deleteObjects(await storage.forImage(image), keysOf(image));
 
-  const res = await Image.deleteOne({ _id: image._id });
-  if (res.deletedCount) {
-    await App.updateOne(
-      { _id: image.app },
-      {
-        $inc: {
-          'stats.images': -1,
-          'stats.bytesIn': -((image.input && image.input.bytes) || 0),
-          'stats.bytesOut': -(image.bytesOut || 0),
-        },
-      }
-    );
+  // Only the request that really deleted the row moves the stats, so a double
+  // click on delete cannot count the same file out twice
+  const deleted = await db.assets.remove(image._id);
+  if (deleted) {
+    await db.apps.addStats(image.appId, {
+      images: -1,
+      bytesIn: -((image.input && image.input.bytes) || 0),
+      bytesOut: -(image.bytesOut || 0),
+    });
   }
 }
 

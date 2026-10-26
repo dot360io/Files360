@@ -1,0 +1,47 @@
+{
+  "name": "files360-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Files360: lets an AI agent upload images and documents to your own Files360 instance and get CDN URLs back.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "files360",
+    "upload",
+    "images",
+    "cdn",
+    "s3"
+  ],
+  "homepage": "https://files360.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dot360io/Files360.git",
+    "directory": "mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/dot360io/Files360/issues"
+  },
+  "license": "AGPL-3.0-only",
+  "author": "Dot360",
+  "type": "commonjs",
+  "main": "src/server.js",
+  "bin": {
+    "files360-mcp": "bin/files360-mcp.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node bin/files360-mcp.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.7"
+  }
+}

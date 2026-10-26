@@ -1,0 +1,35 @@
+# Files360 with its own PostgreSQL. POSTGRES_PASSWORD must be set, e.g. in .env:
+#   POSTGRES_PASSWORD=$(openssl rand -hex 24) docker compose -f docker-compose.postgres.yml up -d
+services:
+  files360:
+    image: ghcr.io/dot360io/files360:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "4360:4360"
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4360}
+      DATABASE_URL: postgres://files360:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/files360
+    volumes:
+      # Still needed: the generated secrets live here
+      - files360-data:/data
+
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: files360
+      POSTGRES_DB: files360
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U files360"]
+      interval: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  files360-data:
+  postgres-data:

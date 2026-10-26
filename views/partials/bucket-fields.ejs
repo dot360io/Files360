@@ -1,0 +1,106 @@
+<%# Connect-storage fields, shared by Storage and the setup wizard. Needs preset, form, error and bucketDoc (null when new). %>
+<% const isEdit = Boolean(bucketDoc); %>
+  <% if (error) { %>
+    <div class="alert alert-danger mt-16" role="alert"><%- icon('alert') %><div><%= error %></div></div>
+  <% } %>
+
+  <div class="stack">
+    <section class="panel">
+      <div class="panel-head"><div><h2>Bucket</h2><p>Where the optimized images are written.</p></div></div>
+      <div class="panel-body fields-2">
+        <div class="field">
+          <label for="name">Display name</label>
+          <input id="name" name="name" type="text" maxlength="60" required value="<%= form.name || '' %>" placeholder="e.g. Production images">
+          <p class="hint">Only used inside this dashboard.</p>
+        </div>
+        <div class="field">
+          <label for="bucket">Bucket name</label>
+          <input id="bucket" name="bucket" type="text" maxlength="120" required value="<%= form.bucket || '' %>" placeholder="my-images" data-bucket-name autocomplete="off">
+          <p class="hint">Exactly as it appears at <%= preset.label %>.</p>
+        </div>
+
+        <% if (preset.needsAccount) { %>
+          <div class="field">
+            <label for="account"><%= preset.accountLabel || 'Account ID' %></label>
+            <input id="account" name="account" type="text" maxlength="80" required value="<%= form.account || '' %>" data-account autocomplete="off">
+            <p class="hint"><%= preset.accountHelp || '' %></p>
+          </div>
+        <% } %>
+
+        <% if (preset.regions) { %>
+          <div class="field">
+            <label for="region"><%= preset.regionLabel %></label>
+            <select id="region" name="region" data-region>
+              <% preset.regions.forEach(function (r) { %>
+                <option value="<%= r.id %>" <%= form.region === r.id ? 'selected' : '' %>><%= r.label %> — <%= r.id %></option>
+              <% }) %>
+            </select>
+          </div>
+        <% } else { %>
+          <div class="field">
+            <label for="region"><%= preset.regionLabel %></label>
+            <input id="region" name="region" type="text" maxlength="40" value="<%= form.region || 'us-east-1' %>" data-region>
+            <p class="hint">Most self-hosted servers accept <code>us-east-1</code>.</p>
+          </div>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Credentials</h2><p>Encrypted before they are written to the database.</p></div></div>
+      <div class="panel-body fields-2">
+        <div class="field">
+          <label for="accessKey">Access key</label>
+          <input id="accessKey" name="accessKey" type="text" maxlength="255" required value="<%= form.accessKey || '' %>" autocomplete="off" spellcheck="false" data-select-on-focus>
+        </div>
+        <div class="field">
+          <label for="secret">Secret key</label>
+          <input id="secret" name="secret" type="password" maxlength="255" <%= isEdit ? '' : 'required' %> autocomplete="new-password" spellcheck="false" placeholder="<%= isEdit ? 'Stored. Leave blank to keep it.' : '' %>">
+          <p class="hint"><%= isEdit ? 'Only fill this in to replace the stored secret.' : 'Shown once by the provider. It is never displayed again here.' %></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Public URL</h2><p><%= preset.publicHelp %></p></div></div>
+      <div class="panel-body">
+        <div class="field">
+          <label for="publicUrl">Base URL of the stored objects</label>
+          <input id="publicUrl" name="publicUrl" type="url" maxlength="255" required value="<%= form.publicUrl || '' %>" placeholder="https://cdn.example.com" data-public-url autocomplete="off">
+          <p class="hint" data-public-hint>Image URLs become this base plus <code>/&lt;app&gt;/&lt;folder&gt;/&lt;hash&gt;/&lt;size&gt;.webp</code>. Point it at your CDN if you have one.</p>
+        </div>
+
+        <% if (!preset.supportsAcl) { %>
+          <div class="alert alert-info mt-16" role="note">
+            <%- icon('info') %>
+            <div><strong><%= preset.label %> has no per-object permissions.</strong> Whether a file is readable is decided by the bucket itself. If an app keeps original uploads, those originals are as public as everything else in this bucket.</div>
+          </div>
+        <% } %>
+      </div>
+    </section>
+
+    <details class="panel" <%= isEdit ? 'open' : '' %>>
+      <summary class="panel-head"><div><h2>Advanced</h2><p>Only needed if the preset does not match your setup.</p></div></summary>
+      <div class="panel-body">
+        <div class="field">
+          <label for="endpoint">S3 endpoint</label>
+          <input id="endpoint" name="endpoint" type="url" maxlength="255" value="<%= form.endpoint || '' %>" placeholder="<%= preset.id === 'aws' ? 'Derived from the region' : 'https://s3.example.com' %>" data-endpoint autocomplete="off">
+          <p class="hint" data-endpoint-hint>Filled in from the <%= preset.regionLabel.toLowerCase() %> above. Change it only for a custom or private endpoint.</p>
+        </div>
+        <label class="switch mt-20">
+          <input type="checkbox" name="forcePathStyle" <%= form.forcePathStyle ? 'checked' : '' %> data-path-style>
+          <span class="track"></span>
+          <span><strong>Path-style URLs</strong><small>Sends <code>endpoint/bucket/key</code> instead of <code>bucket.endpoint/key</code>. Needed by MinIO and most self-hosted servers.</small></span>
+        </label>
+
+        <% if (isEdit) { %>
+          <label class="switch mt-20">
+            <input type="checkbox" name="confirmUrlChange">
+            <span class="track"></span>
+            <span><strong>Let me change the public URL</strong><small>Images already stored here keep the URL they were saved with. Only tick this if the domain really moved.</small></span>
+          </label>
+        <% } %>
+      </div>
+    </details>
+  </div>
+

@@ -65,7 +65,7 @@
           <dt>Documents</dt><dd><%= app.allowDocuments === false ? 'Images only' : 'PDF, Word, Excel, PowerPoint, CSV, text' %></dd>
           <dt>Archives</dt><dd><%= app.allowArchives ? 'ZIP accepted' : 'Not accepted' %></dd>
           <dt>Original</dt><dd><%= app.keepOriginal ? 'Kept privately' : 'Not kept' %></dd>
-          <dt>API keys</dt><dd><a href="/apps/<%= app._id %>/keys"><%= activeKeys %> active</a></dd>
+          <dt>API keys</dt><dd><a href="/apps/<%= app._id %>/keys"><%= activeKeys === 0 ? 'None yet, generate one' : activeKeys + ' active' %></a></dd>
         </dl>
         <div class="label mt-16">Sizes</div>
         <div class="chips">
@@ -79,7 +79,7 @@
     <section class="panel">
       <div class="panel-head"><div><h2>Quick connect</h2><p>Test a key from your terminal</p></div></div>
       <div class="panel-body">
-        <% const curl = 'curl -X POST ' + publicUrl + '/v1/images \\\n  -H "Authorization: Bearer $FILES360_API_KEY" \\\n  -F "file=@photo.jpg" \\\n  -F "folder=products"'; %>
+        <% const curl = 'curl -X POST ' + publicUrl + '/v1/files \\\n  -H "Authorization: Bearer $FILES360_API_KEY" \\\n  -F "file=@photo.jpg" \\\n  -F "folder=products"'; %>
         <div class="code-block"><pre><%= curl %></pre><button class="btn" type="button" data-copy="<%= curl %>">Copy</button></div>
         <a class="btn btn-sm mt-16" href="/apps/<%= app._id %>/integration/download"><%- icon('download') %>Download integration guide</a>
       </div>

@@ -1,0 +1,29 @@
+<%- include('_start') %>
+<div class="setup-wide">
+  <div class="page-head">
+    <div class="app-title">
+      <span class="provider-logo-wrap lg"><%- logo(preset.id) %></span>
+      <div>
+        <h1>Connect <%= preset.label %> <%= preset.product %></h1>
+        <p><%= preset.credsHelp %></p>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="/setup/storage" data-bucket-form data-provider="<%= preset.id %>">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="provider" value="<%= preset.id %>">
+    <script type="application/json" data-provider-catalog><%- JSON.stringify(catalog) %></script>
+
+    <%- include('../partials/bucket-fields', { preset, form, error, bucketDoc }) %>
+
+    <div class="save-bar">
+      <span class="muted">Connecting uploads a test file, reads it back over the public URL and deletes it.</span>
+      <div class="actions">
+        <a class="btn" href="/setup/storage">Back</a>
+        <button class="btn btn-primary" type="submit"><%- icon('cloudUp') %>Connect and test</button>
+      </div>
+    </div>
+  </form>
+</div>
+<%- include('_end') %>

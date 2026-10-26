@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+data
+.env
+.env.*
+!.env.example
+*.log
+coverage
+test
+mcp
+integrations
+docs/.vitepress/cache
+docs/.vitepress/dist
+docs/node_modules
+.DS_Store
+launch

@@ -2,7 +2,7 @@ const { HttpError } = require('./errors');
 
 const FOLDER_RE = /^[a-z0-9][a-z0-9_-]*(\/[a-z0-9][a-z0-9_-]*){0,4}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,39}$/;
-const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
+const ID_RE = /^[a-f0-9]{24}$/i;
 const FITS = ['cover', 'contain', 'inside', 'outside', 'fill'];
 const FORMATS = ['webp', 'avif', 'jpeg'];
 const MAX_VARIANTS = 8;
@@ -94,19 +94,14 @@ function parseVariantRows(body) {
   });
 }
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 module.exports = {
   FITS,
   FORMATS,
   SLUG_RE,
-  OBJECT_ID_RE,
+  ID_RE,
   sanitizeFolder,
   sanitizeRef,
   slugify,
   clampInt,
   parseVariantRows,
-  escapeRegex,
 };

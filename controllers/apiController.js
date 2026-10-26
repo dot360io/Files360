@@ -1,14 +1,14 @@
 const config = require('../config/env');
-const Image = require('../models/Image');
+const db = require('../db');
 const { ingest, removeImage } = require('../utils/assetPipeline');
 const documents = require('../utils/documents');
 const { fetchRemote } = require('../utils/fetchRemote');
 const { HttpError } = require('../utils/errors');
-const { sanitizeFolder, sanitizeRef, clampInt, OBJECT_ID_RE } = require('../utils/validate');
+const { sanitizeFolder, sanitizeRef, clampInt, ID_RE } = require('../utils/validate');
 
 async function findOwnImage(req) {
-  if (!OBJECT_ID_RE.test(req.params.id)) throw new HttpError(404, 'not_found', 'File not found');
-  const image = await Image.findOne({ _id: req.params.id, app: req.appDoc._id });
+  if (!ID_RE.test(req.params.id)) throw new HttpError(404, 'not_found', 'File not found');
+  const image = await db.assets.getForApp(req.params.id, req.appDoc._id);
   if (!image) throw new HttpError(404, 'not_found', 'File not found');
   return image;
 }
@@ -51,7 +51,7 @@ exports.upload = async (req, res) => {
     source: 'upload',
     apiKeyId: req.apiKey._id,
   });
-  res.status(duplicate ? 200 : 201).json({ ...image.toApi(), duplicate });
+  res.status(duplicate ? 200 : 201).json({ ...db.assets.toApi(image), duplicate });
 };
 
 exports.importFromUrl = async (req, res) => {
@@ -74,26 +74,25 @@ exports.importFromUrl = async (req, res) => {
     source: 'url',
     apiKeyId: req.apiKey._id,
   });
-  res.status(duplicate ? 200 : 201).json({ ...image.toApi(), duplicate });
+  res.status(duplicate ? 200 : 201).json({ ...db.assets.toApi(image), duplicate });
 };
 
 exports.list = async (req, res) => {
   const page = clampInt(req.query.page, 1, 1, 100_000);
   const limit = clampInt(req.query.limit, 50, 1, 200);
-  const filter = { app: req.appDoc._id };
-  if (req.query.folder !== undefined) filter.folder = sanitizeFolder(req.query.folder);
-  if (req.query.ref !== undefined) filter.ref = sanitizeRef(req.query.ref);
-
-  const [items, total] = await Promise.all([
-    Image.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
-    Image.countDocuments(filter),
-  ]);
-  res.json({ page, limit, total, items: items.map((i) => i.toApi()) });
+  const { items, total } = await db.assets.listForApi({
+    appId: req.appDoc._id,
+    folder: req.query.folder !== undefined ? sanitizeFolder(req.query.folder) : undefined,
+    ref: req.query.ref !== undefined ? sanitizeRef(req.query.ref) : undefined,
+    page,
+    limit,
+  });
+  res.json({ page, limit, total, items: items.map(db.assets.toApi) });
 };
 
 exports.show = async (req, res) => {
   const image = await findOwnImage(req);
-  res.json(image.toApi());
+  res.json(db.assets.toApi(image));
 };
 
 exports.destroy = async (req, res) => {

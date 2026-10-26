@@ -1,31 +1,31 @@
 const config = require('../config/env');
-const App = require('../models/App');
-const Image = require('../models/Image');
+const db = require('../db');
 
 const DAYS = 30;
 
 exports.index = async (req, res) => {
-  const since = new Date(Date.now() - (DAYS - 1) * 86_400_000);
+  // A day of margin either side of UTC midnight covers every time zone
+  const since = new Date(Date.now() - DAYS * 86_400_000);
   since.setUTCHours(0, 0, 0, 0);
 
-  const [apps, recent, daily] = await Promise.all([
-    App.find().sort({ 'stats.bytesOut': -1 }).lean(),
-    Image.find().sort({ createdAt: -1 }).limit(10).populate('app', 'name slug').lean(),
-    Image.aggregate([
-      { $match: { createdAt: { $gte: since } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: config.timezone } },
-          count: { $sum: 1 },
-          bytes: { $sum: '$bytesOut' },
-        },
-      },
-    ]),
+  const [apps, recent, slots] = await Promise.all([
+    db.apps.list({ sort: 'bytesOut' }),
+    db.assets.recent({ limit: 10 }),
+    db.assets.uploadSlots(since.getTime()),
   ]);
 
   const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const dayLabel = new Intl.DateTimeFormat('en-GB', { timeZone: config.timezone, day: 'numeric', month: 'short' });
-  const byDay = new Map(daily.map((d) => [d._id, d]));
+  // The database buckets by UTC quarter hour; the local day is worked out here,
+  // because no time zone function means the same thing on all three engines
+  const byDay = new Map();
+  for (const s of slots) {
+    const key = dayKey.format(new Date(s.at));
+    const day = byDay.get(key) || { count: 0, bytes: 0 };
+    day.count += s.count;
+    day.bytes += s.bytes;
+    byDay.set(key, day);
+  }
   const chart = [];
   for (let i = DAYS - 1; i >= 0; i -= 1) {
     const d = new Date(Date.now() - i * 86_400_000);

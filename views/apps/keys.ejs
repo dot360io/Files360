@@ -24,12 +24,12 @@
         </thead>
         <tbody>
           <% if (keys.length === 0) { %>
-            <tr><td colspan="6" class="muted">No keys yet. Generate one to connect this app.</td></tr>
+            <tr><td colspan="6" class="muted">No keys yet. Generate one when you are ready to connect this app &mdash; the <a href="/apps/<%= app._id %>/integration">integration guide</a> covers everything else.</td></tr>
           <% } %>
           <% keys.forEach(function (k) { %>
             <tr class="<%= k.revokedAt ? 'is-revoked' : '' %>">
               <td><strong><%= k.label %></strong></td>
-              <td><span class="key-mask">img_<%= k.prefix %>_••••<%= k.last4 %></span></td>
+              <td><span class="key-mask">f360_<%= k.prefix %>_••••<%= k.last4 %></span></td>
               <td class="num" title="<%= fmt.date(k.createdAt) %>"><%= fmt.ago(k.createdAt) %></td>
               <td class="num" title="<%= fmt.date(k.lastUsedAt) %>"><%= fmt.ago(k.lastUsedAt) %></td>
               <td><span class="pill <%= k.revokedAt ? 'off' : '' %>"><%= k.revokedAt ? 'Revoked' : 'Active' %></span></td>

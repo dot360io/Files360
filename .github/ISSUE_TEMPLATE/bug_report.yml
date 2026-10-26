@@ -1,0 +1,102 @@
+name: Bug report
+description: Something in Files360 does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting this. The more of the form you fill in, the sooner it can be reproduced.
+
+        Security vulnerabilities do not belong here. Report them privately as described in SECURITY.md.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: A release tag, or the output of `git rev-parse --short HEAD`.
+      placeholder: v1.0.0 or a1b2c3d
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database engine
+      options:
+        - SQLite
+        - Postgres
+        - MySQL
+    validations:
+      required: true
+
+  - type: input
+    id: storage
+    attributes:
+      label: Storage provider
+      description: The provider preset you chose, or the S3-compatible service you point it at.
+      placeholder: Cloudflare R2, Backblaze B2, MinIO, ...
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      description: The output of `node --version`.
+      placeholder: v22.11.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How it is deployed
+      options:
+        - Docker
+        - PM2
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, in order. Include the request or file type if it is an upload problem.
+      placeholder: |
+        1. Upload a .docx through POST /v1/files
+        2. Open the asset in the library
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant server output. Remove API keys, bucket credentials, session cookies and anything personal first.
+      render: shell
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before you submit
+      options:
+        - label: This is not a security vulnerability. Those go privately through SECURITY.md.
+          required: true
+        - label: I have removed credentials, API keys and personal data from everything above.
+          required: true

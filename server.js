@@ -1,11 +1,12 @@
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const { ConnectSessionKnexStore } = require('connect-session-knex');
 const helmet = require('helmet');
 
 const config = require('./config/env');
-const { connectDatabase, mongoose } = require('./config/database');
+const db = require('./db');
+const { boot } = require('./utils/boot');
 
 const { csrf, flash, requireAdmin, loadNav } = require('./middleware/auth');
 const errorHandler = require('./middleware/errorHandler');
@@ -15,13 +16,8 @@ const storage = require('./utils/storage');
 const fmt = require('./utils/format');
 const icon = require('./utils/icons');
 const logo = require('./utils/providerLogos');
-
-const apiRoutes = require('./routes/api');
-const authRoutes = require('./routes/auth');
-const dashboardRoutes = require('./routes/dashboard');
-const libraryRoutes = require('./routes/library');
-const appRoutes = require('./routes/apps');
-const bucketRoutes = require('./routes/buckets');
+const openapi = require('./utils/openapi');
+const setup = require('./controllers/setupController');
 
 const app = express();
 
@@ -61,9 +57,10 @@ app.use(
   })
 );
 
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   res.json({
-    ok: mongoose.connection.readyState === 1,
+    ok: config.setupNeeded ? true : await db.ping(),
+    ...(config.setupNeeded ? { setup: true } : {}),
     queue: optimizer.queueStats(),
     uptime: Math.round(process.uptime()),
   });
@@ -71,50 +68,82 @@ app.get('/health', (req, res) => {
 
 app.use('/public', express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
-// Public API: API keys, no cookies
-app.use('/v1', apiRoutes);
+// Public descriptions of the API for tools and agents, pointed at this instance
+app.get('/openapi.json', (req, res) => res.json(openapi.spec(config.publicUrl)));
+app.get('/llms.txt', (req, res) => res.type('text/plain; charset=utf-8').send(openapi.llmsTxt(config.publicUrl)));
 
-// Dashboard: session cookie
-app.use(
-  session({
-    name: 'files360.sid',
-    secret: config.sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: config.mongoUri, ttl: 7 * 24 * 3600 }),
-    cookie: { httpOnly: true, sameSite: 'lax', secure: 'auto', maxAge: 7 * 24 * 3600 * 1000 },
-  })
-);
-app.use(express.urlencoded({ extended: false, limit: '256kb' }));
-app.use(csrf);
-app.use(flash);
+/**
+ * Everything after this point is one of two routers: the setup wizard while
+ * the install is unconfigured, the real app afterwards. Finishing the wizard
+ * swaps them in place, so nobody has to restart anything.
+ */
+let current = null;
+app.use((req, res, next) => current(req, res, next));
 
-app.use(authRoutes);
+let originTimer = null;
 
-app.use(requireAdmin, loadNav);
-app.use('/', dashboardRoutes);
-app.use('/library', libraryRoutes);
-app.use('/apps', appRoutes);
-app.use('/storage', bucketRoutes);
+function mainRouter() {
+  const router = express.Router();
 
-app.use((req, res, next) => next(new HttpError(404, 'not_found', 'This page does not exist')));
-app.use(errorHandler);
+  // Public API: API keys, no cookies
+  router.use('/v1', require('./routes/api'));
+
+  // Dashboard: session cookie
+  router.use(
+    session({
+      name: 'files360.sid',
+      secret: config.sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      store: new ConnectSessionKnexStore({ knex: db.knex(), tableName: 'sessions', cleanupInterval: 15 * 60_000 }),
+      cookie: { httpOnly: true, sameSite: 'lax', secure: 'auto', maxAge: 7 * 24 * 3600 * 1000 },
+    })
+  );
+  router.use(express.urlencoded({ extended: false, limit: '256kb' }));
+  router.use(csrf);
+  router.use(flash);
+
+  router.use(require('./routes/auth'));
+
+  router.use(requireAdmin, loadNav);
+  router.use('/', require('./routes/dashboard'));
+  router.use('/library', require('./routes/library'));
+  router.use('/apps', require('./routes/apps'));
+  router.use('/storage', require('./routes/buckets'));
+
+  router.use((req, res, next) => next(new HttpError(404, 'not_found', 'This page does not exist')));
+  router.use(errorHandler);
+  return router;
+}
+
+async function startMain() {
+  await storage.refreshOrigins();
+  clearInterval(originTimer);
+  originTimer = setInterval(() => storage.refreshOrigins().catch(() => {}), 60_000);
+  originTimer.unref();
+  config.setupNeeded = false;
+  current = mainRouter();
+}
 
 async function start() {
-  await connectDatabase();
+  const { setupNeeded } = await boot();
 
-  await storage.refreshOrigins();
-  const originTimer = setInterval(() => storage.refreshOrigins().catch(() => {}), 60_000);
-  originTimer.unref();
+  if (setupNeeded) {
+    config.setupNeeded = true;
+    current = setup.router({ onComplete: startMain });
+  } else {
+    await startMain();
+  }
 
   const server = app.listen(config.port, config.host, () => {
     console.log(`[files360] running on http://${config.host}:${config.port}`);
+    if (setupNeeded) setup.announce();
   });
 
   const shutdown = (signal) => {
     console.log(`[files360] ${signal}, shutting down`);
     server.close(async () => {
-      await mongoose.disconnect().catch(() => {});
+      await db.close();
       process.exit(0);
     });
     setTimeout(() => process.exit(1), 12_000).unref();

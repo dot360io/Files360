@@ -1,0 +1,23 @@
+# Files360
+
+> Self-hosted upload API and media library. Send a file, get CDN URLs on the operator's own S3-compatible bucket. Images are optimized into named sizes; documents and ZIP archives are stored as uploaded with a preview.
+
+This instance: https://your-files360.example.com
+
+## Using the API
+
+- Authenticate every request with `Authorization: Bearer f360_<prefix>_<secret>` (an app API key, created in the dashboard). Keys belong on servers, never in browser code.
+- `POST /v1/files` multipart: `file` (required), `folder` (optional, lowercase a-z 0-9 - _, up to 5 levels), `ref` (optional, your own id). 201 on create, 200 with `"duplicate": true` when the same file is already in that folder, so retries are safe.
+- `POST /v1/files/from-url` JSON `{"url", "folder", "ref"}`.
+- `GET /v1/files?page=&limit=&folder=&ref=`, `GET /v1/files/{id}`, `DELETE /v1/files/{id}`.
+- `GET /v1/me` returns the app's sizes, format and limits.
+- Every response has `kind`: `image` gives `variants.<size>.url` and `srcset`; `document` gives `file.url` and a `preview` summary.
+- Errors are `{"error": {"code", "message"}}`. Retry 429, 502, 503 and 504 with backoff; do not retry 4xx otherwise.
+- Accepted: JPEG, PNG, WebP, GIF, AVIF, TIFF, SVG (sanitized); documents pdf, xlsx, docx, csv, pptx, txt, doc, xls, ppt when the app allows them; ZIP when the app allows archives. Not HEIC, not video.
+
+## Reference
+
+- [OpenAPI description](https://your-files360.example.com/openapi.json)
+- [Documentation](https://files360.dev)
+- [API reference](https://files360.dev/api)
+- [MCP server](https://files360.dev/agents): `npx files360-mcp`

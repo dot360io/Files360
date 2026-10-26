@@ -1,0 +1,29 @@
+<%- include('_start') %>
+<div class="setup-wide">
+  <div class="page-head">
+    <div>
+      <h1>Storage</h1>
+      <p>The bucket your files are written to and served from. Connecting one runs a real round trip: upload, public read, delete.</p>
+    </div>
+  </div>
+
+  <% if (connected) { %>
+    <div class="alert alert-info field" role="status"><%- icon('check') %><div><strong><%= connected.name %></strong> (<%= connected.providerLabel %>, <code><%= connected.bucket %></code>) passed the test. Pick another provider below to replace it.</div></div>
+  <% } %>
+
+  <%- include('../partials/provider-cards', { providers, base: '/setup/storage' }) %>
+
+  <div class="setup-actions mt-20">
+    <a class="btn btn-ghost" href="/setup/admin">Back</a>
+    <% if (connected) { %>
+      <a class="btn btn-primary" href="/setup/app">Continue</a>
+    <% } else { %>
+      <form method="post" action="/setup/storage/skip">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn" type="submit">Skip for now</button>
+      </form>
+    <% } %>
+  </div>
+  <p class="hint">Skipping is fine: connect a bucket later under Storage. Uploads answer <code>503 storage_unconfigured</code> until you do.</p>
+</div>
+<%- include('_end') %>

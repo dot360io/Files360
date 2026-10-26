@@ -1,0 +1,16 @@
+<%- include('../partials/head') %>
+<body>
+<div class="setup">
+  <header class="setup-head">
+    <span class="brand"><%- include('../partials/brand') %><span><%= appName %></span></span>
+    <% if (locals.step) { %>
+      <ol class="setup-steps" aria-label="Setup progress">
+        <% steps.forEach(function (s, i) { %>
+          <li class="<%= s.id === step ? 'is-current' : s.done ? 'is-done' : '' %>" <%- s.id === step ? 'aria-current="step"' : '' %>>
+            <span class="setup-step-num"><%- s.done && s.id !== step ? icon('check') : i + 1 %></span><span><%= s.label %></span>
+          </li>
+        <% }) %>
+      </ol>
+    <% } %>
+  </header>
+  <main class="setup-body">

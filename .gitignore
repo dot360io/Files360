@@ -6,3 +6,8 @@ node_modules
 data/
 coverage/
 
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+mcp/node_modules/
+.cloudinary-import.json
+cloudinary-map.csv

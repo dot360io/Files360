@@ -441,3 +441,22 @@
     if (succeeded > 0 && !running && !pending.length) window.location.reload();
   });
 })();
+
+/* Setup wizard: server fields only matter for Postgres and MySQL */
+(() => {
+  const form = document.querySelector('[data-db-form]');
+  if (!form) return;
+  const radios = [...form.querySelectorAll('[data-db-client]')];
+  const server = form.querySelector('[data-db-server]');
+  const test = form.querySelector('[data-db-test]');
+  const port = form.querySelector('[data-db-port]');
+  const sync = () => {
+    const chosen = radios.find((r) => r.checked);
+    const isServer = Boolean(chosen && chosen.value !== 'sqlite');
+    if (server) server.hidden = !isServer;
+    if (test) test.hidden = !isServer;
+    if (port && chosen && chosen.dataset.port) port.placeholder = chosen.dataset.port;
+  };
+  radios.forEach((r) => r.addEventListener('change', sync));
+  sync();
+})();

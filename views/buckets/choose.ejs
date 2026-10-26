@@ -8,32 +8,10 @@
   <a class="btn" href="/storage"><%- icon('chevronRight') %>Back to storage</a>
 </div>
 
-<div class="provider-cards">
-  <% providers.forEach(function (p) { %>
-    <a class="panel provider-card" href="/storage/new/<%= p.id %>">
-      <span class="provider-logo-wrap"><%- logo(p.id) %></span>
-      <span class="provider-name">
-        <strong><%= p.label %></strong>
-        <small><%= p.product %></small>
-      </span>
-      <span class="provider-blurb"><%= p.blurb %></span>
-      <span class="provider-facts">
-        <span class="fact">
-          <%- icon('database') %>
-          <%= p.regionFact || (p.regions ? p.regions.length + ' ' + p.regionLabel.toLowerCase() + (p.regions.length === 1 ? '' : 's') : 'Your own endpoint') %>
-        </span>
-        <span class="fact">
-          <%- icon(p.supportsAcl === false ? 'info' : 'check') %>
-          <%= p.supportsAcl === false ? 'Bucket-wide access' : 'Per-object ACLs' %>
-        </span>
-      </span>
-      <span class="provider-cta">Connect<%- icon('chevronRight') %></span>
-    </a>
-  <% }) %>
-</div>
+<%- include('../partials/provider-cards', { providers, base: '/storage/new' }) %>
 
 <p class="hint mt-20">
-  Every provider here speaks the S3 API, so they all work the same way once connected. Pick <strong>Other</strong> for anything not listed, including Storj, iDrive e2, OVH, Linode and Google Cloud Storage with HMAC keys.
+  Every provider here speaks the S3 API, so they all work the same way once connected. Pick <strong>Other</strong> for anything not listed, including Garage, SeaweedFS, Storj, iDrive e2, OVH, Linode and Google Cloud Storage with HMAC keys.
 </p>
 
 <%- include('../partials/shell-end') %>

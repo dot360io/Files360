@@ -1,0 +1,35 @@
+# Files360 with its own MySQL. MYSQL_PASSWORD and MYSQL_ROOT_PASSWORD must be set, e.g. in .env.
+services:
+  files360:
+    image: ghcr.io/dot360io/files360:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "4360:4360"
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4360}
+      DATABASE_URL: mysql://files360:${MYSQL_PASSWORD:?set MYSQL_PASSWORD}@db:3306/files360
+    volumes:
+      # Still needed: the generated secrets live here
+      - files360-data:/data
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: files360
+      MYSQL_USER: files360
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      retries: 20
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  files360-data:
+  mysql-data:

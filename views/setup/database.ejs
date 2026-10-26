@@ -1,0 +1,68 @@
+<%- include('_start') %>
+<form class="panel setup-card" method="post" action="/setup/database" data-db-form>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <h1>Database</h1>
+  <p class="lead">Where apps, keys and the media library are recorded. The files themselves go to your storage bucket.</p>
+
+  <% if (error) { %>
+    <div class="alert alert-danger field" role="alert"><%- icon('alert') %><div><%= error %></div></div>
+  <% } %>
+  <% if (result) { %>
+    <div class="alert alert-info field" role="status"><%- icon('check') %><div><%= result %></div></div>
+  <% } %>
+
+  <% if (fixed) { %>
+    <div class="alert alert-info field" role="note"><%- icon('info') %><div><strong>Set by <code>DATABASE_URL</code>.</strong> <%= fixed %>. The tables are already in place.</div></div>
+    <a class="btn btn-primary" href="/setup/admin">Continue</a>
+  <% } else { %>
+    <fieldset class="setup-choices field">
+      <legend>Engine</legend>
+      <label class="setup-choice">
+        <input type="radio" name="client" value="sqlite" <%= form.client === 'sqlite' ? 'checked' : '' %> data-db-client>
+        <span><strong>SQLite</strong><small>Recommended. One file in the data directory, nothing to install: <%= sqlitePath %>.</small></span>
+      </label>
+      <label class="setup-choice">
+        <input type="radio" name="client" value="postgres" <%= form.client === 'postgres' ? 'checked' : '' %> data-db-client data-port="<%= defaultPorts.postgres %>">
+        <span><strong>PostgreSQL</strong><small>An existing server and an empty database.</small></span>
+      </label>
+      <label class="setup-choice">
+        <input type="radio" name="client" value="mysql" <%= form.client === 'mysql' ? 'checked' : '' %> data-db-client data-port="<%= defaultPorts.mysql %>">
+        <span><strong>MySQL or MariaDB</strong><small>An existing server and an empty database.</small></span>
+      </label>
+    </fieldset>
+
+    <div class="fields-2" data-db-server <%= form.client === 'sqlite' ? 'hidden' : '' %>>
+      <div class="field">
+        <label for="host">Host</label>
+        <input id="host" name="host" type="text" maxlength="255" value="<%= form.host || '' %>" placeholder="db.internal" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="port">Port</label>
+        <input id="port" name="port" type="number" min="1" max="65535" value="<%= form.port || '' %>" placeholder="<%= defaultPorts[form.client] || defaultPorts.postgres %>" data-db-port>
+      </div>
+      <div class="field">
+        <label for="user">User</label>
+        <input id="user" name="user" type="text" maxlength="120" value="<%= form.user || '' %>" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" maxlength="255" value="<%= form.password || '' %>" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="database">Database name</label>
+        <input id="database" name="database" type="text" maxlength="120" value="<%= form.database || '' %>" placeholder="files360" autocomplete="off" spellcheck="false">
+      </div>
+      <label class="switch field">
+        <input type="checkbox" name="ssl" <%= form.ssl ? 'checked' : '' %>>
+        <span class="track"></span>
+        <span><strong>Use TLS</strong><small>Needed by most hosted databases.</small></span>
+      </label>
+    </div>
+
+    <div class="setup-actions">
+      <button class="btn" type="submit" name="action" value="test" data-db-test <%= form.client === 'sqlite' ? 'hidden' : '' %>><%- icon('zap') %>Test connection</button>
+      <button class="btn btn-primary" type="submit" name="action" value="save">Create the tables and continue</button>
+    </div>
+  <% } %>
+</form>
+<%- include('_end') %>

@@ -1,0 +1,28 @@
+<%- include('_start') %>
+<form class="panel setup-card" method="post" action="/setup/app">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <h1>First app</h1>
+  <p class="lead">An app is one website or service that uploads here. It gets its own folder in the bucket and its own sizes and keys.</p>
+  <% if (error) { %>
+    <div class="alert alert-danger field" role="alert"><%- icon('alert') %><div><%= error %></div></div>
+  <% } %>
+  <div class="field">
+    <label for="app-name">Name</label>
+    <input id="app-name" name="name" type="text" maxlength="80" value="<%= form.name || '' %>" placeholder="My shop" data-slug-source autofocus>
+  </div>
+  <div class="field">
+    <label for="app-slug">Folder</label>
+    <input id="app-slug" name="slug" type="text" maxlength="40" pattern="[a-z0-9][a-z0-9\-]{1,39}" value="<%= form.slug || '' %>" placeholder="my-shop" data-slug-target>
+    <p class="hint">Its folder in the bucket. It cannot be changed later, because stored URLs contain it.</p>
+  </div>
+  <p class="hint">No API key is made here. Generate one from the app's Keys tab once you have read its integration guide.</p>
+  <% if (storageWarning) { %>
+    <p class="hint">No storage is connected yet, so uploads will wait until you add a bucket under Storage.</p>
+  <% } %>
+  <div class="setup-actions">
+    <a class="btn btn-ghost" href="/setup/storage">Back</a>
+    <button class="btn" type="submit" name="action" value="skip" formnovalidate>Skip and finish</button>
+    <button class="btn btn-primary" type="submit" name="action" value="create">Create app and finish</button>
+  </div>
+</form>
+<%- include('_end') %>

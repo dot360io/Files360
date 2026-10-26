@@ -1,0 +1,11 @@
+<%- include('_start') %>
+<div class="panel setup-card">
+  <h1>Setup is finished</h1>
+  <p class="lead">Settings are saved in <code>data/config.json</code> and the wizard is now closed. Sign in as <strong><%= email %></strong>.</p>
+  <ul class="setup-next">
+    <% if (!storageConnected) { %><li>Connect a bucket under <strong>Storage</strong>. Nothing can be uploaded until you do.</li><% } %>
+    <% if (appCreated) { %><li>Open your app, read its integration guide, then generate an API key from its Keys tab.</li><% } else { %><li>Create an app under <strong>Apps</strong>, then generate an API key from its Keys tab.</li><% } %>
+  </ul>
+  <a class="btn btn-primary" href="/login">Sign in</a>
+</div>
+<%- include('_end') %>

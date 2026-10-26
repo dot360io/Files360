@@ -1,9 +1,9 @@
 /**
- * Encrypts storage secrets before they are written to MongoDB.
+ * Encrypts storage secrets before they are written to the database.
  *
- * The key comes from STORAGE_KEY, falling back to SESSION_SECRET so an existing
- * install needs no new env var. Changing that value makes stored secrets
- * unreadable, and the buckets have to be reconnected.
+ * The key comes from STORAGE_KEY, or the one generated into data/secrets.json
+ * on first start. Changing that value makes stored secrets unreadable, and the
+ * buckets have to be reconnected.
  */
 const crypto = require('crypto');
 const config = require('../config/env');
@@ -11,10 +11,9 @@ const config = require('../config/env');
 const VERSION = 'v1';
 // Fixed salt: the secret it protects is already high-entropy, and a stored
 // random salt would need a second round trip on every decrypt.
-// Deliberately unchanged across the rename: this salt derives the key that
-// encrypts stored bucket secrets, so touching it would make every secret
-// already in the database unreadable.
-const SALT = Buffer.from('image360.storage.v1');
+// Never change it: this salt derives the key that encrypts stored bucket
+// secrets, so touching it makes every secret already in a database unreadable.
+const SALT = Buffer.from('files360.storage.v1');
 
 let cachedKey = null;
 function key() {

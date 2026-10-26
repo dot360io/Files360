@@ -1,0 +1,834 @@
+# Files360
+
+> Self-hosted upload API and media library. Send a file, get CDN URLs on the operator's own S3-compatible bucket. Images are optimized into named sizes; documents and ZIP archives are stored as uploaded with a preview.
+
+This instance: https://your-files360.example.com
+
+## Using the API
+
+- Authenticate every request with `Authorization: Bearer f360_<prefix>_<secret>` (an app API key, created in the dashboard). Keys belong on servers, never in browser code.
+- `POST /v1/files` multipart: `file` (required), `folder` (optional, lowercase a-z 0-9 - _, up to 5 levels), `ref` (optional, your own id). 201 on create, 200 with `"duplicate": true` when the same file is already in that folder, so retries are safe.
+- `POST /v1/files/from-url` JSON `{"url", "folder", "ref"}`.
+- `GET /v1/files?page=&limit=&folder=&ref=`, `GET /v1/files/{id}`, `DELETE /v1/files/{id}`.
+- `GET /v1/me` returns the app's sizes, format and limits.
+- Every response has `kind`: `image` gives `variants.<size>.url` and `srcset`; `document` gives `file.url` and a `preview` summary.
+- Errors are `{"error": {"code", "message"}}`. Retry 429, 502, 503 and 504 with backoff; do not retry 4xx otherwise.
+- Accepted: JPEG, PNG, WebP, GIF, AVIF, TIFF, SVG (sanitized); documents pdf, xlsx, docx, csv, pptx, txt, doc, xls, ppt when the app allows them; ZIP when the app allows archives. Not HEIC, not video.
+
+## Reference
+
+- [OpenAPI description](https://your-files360.example.com/openapi.json)
+- [Documentation](https://files360.dev)
+- [API reference](https://files360.dev/api)
+- [MCP server](https://files360.dev/agents): `npx files360-mcp`
+
+---
+
+# Install
+
+Files360 is one Node.js process. It needs somewhere to keep its data directory and an S3-compatible bucket to write files to. It never serves the files itself: browsers fetch them from the bucket or your CDN.
+
+## Docker (recommended)
+
+```bash
+curl -O https://raw.githubusercontent.com/dot360io/Files360/main/docker-compose.yml
+docker compose up -d
+docker compose logs files360 | grep setup
+```
+
+The last command prints a one-time link such as `http://localhost:4360/setup?token=…`. Open it and the setup wizard asks for four things:
+
+1. **Database.** SQLite is the default and needs nothing installed. Postgres and MySQL work too, with a **Test connection** button that tells you which step failed.
+2. **Administrator.** The email and password you sign in with.
+3. **Storage.** Pick a provider and paste a bucket name and key pair. Saving uploads a test file, reads it back over the public URL and deletes it. You can skip this and do it later.
+4. **First app.** A name and a folder. API keys are created afterwards, from the app's Keys tab.
+
+The token is valid until the next restart, and the wizard closes for good when it finishes.
+
+Everything Files360 needs to remember lives in the `/data` volume: `config.json`, `secrets.json` and, with SQLite, the database. **Back up that volume.** Losing `secrets.json` makes the stored bucket credentials unreadable.
+
+The image is published for `linux/amd64` and `linux/arm64` as `ghcr.io/dot360io/files360`.
+
+### With Postgres or MySQL
+
+```bash
+curl -O https://raw.githubusercontent.com/dot360io/Files360/main/docker-compose.postgres.yml
+POSTGRES_PASSWORD=$(openssl rand -hex 24) docker compose -f docker-compose.postgres.yml up -d
+```
+
+`docker-compose.mysql.yml` works the same way with `MYSQL_PASSWORD` and `MYSQL_ROOT_PASSWORD`. Put the passwords in a `.env` file next to the compose file so they survive a restart. When `DATABASE_URL` is set, the wizard skips its database step.
+
+### Without the wizard
+
+For unattended deployments, give the administrator in the environment and the wizard never appears:
+
+```yaml
+environment:
+  ADMIN_EMAIL: you@example.com
+  ADMIN_PASSWORD: a-long-password   # hashed at start, never stored
+```
+
+`ADMIN_PASSWORD_HASH` (a bcrypt hash from `npm run hash-password`) works instead of a plain password. Either is only read when the database has no administrator yet.
+
+## From source
+
+Node.js 20.9 or later.
+
+```bash
+git clone https://github.com/dot360io/Files360.git
+cd Files360
+npm ci --omit=dev
+npm start
+```
+
+The setup link is printed to the console. In production run it under a process manager; `ecosystem.config.js` is ready for PM2:
+
+```bash
+pm2 start ecosystem.config.js && pm2 save
+```
+
+## Behind a reverse proxy
+
+Files360 listens on `127.0.0.1:4360` outside Docker. Put Nginx, Caddy or Traefik in front for TLS, and keep the proxy's body size limit above `MAX_UPLOAD_MB`:
+
+```nginx
+server {
+  server_name files.example.com;
+  client_max_body_size 30m;
+  location / {
+    proxy_pass http://127.0.0.1:4360;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+Set `PUBLIC_URL=https://files.example.com` so the generated integration guides show the right address.
+
+## Upgrading
+
+Pull the new image (or `git pull && npm ci --omit=dev`) and restart. Database migrations run at every start.
+
+---
+
+# Configure
+
+Nothing has to be configured by hand: the setup wizard writes `data/config.json` and generates its own secrets. Environment variables are for deployments that want to decide things up front, and they always win over the file.
+
+## Environment variables
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `PUBLIC_URL` | `http://localhost:4360` | The address people reach the service at. Used in the generated integration guides and `openapi.json`. |
+| `HOST` / `PORT` | `127.0.0.1` / `4360` | Where to listen. The Docker image listens on `0.0.0.0`. |
+| `DATA_DIR` | `./data` (`/data` in Docker) | Holds `config.json`, `secrets.json` and the SQLite database. |
+| `DATABASE_URL` | none | `sqlite:files360.sqlite`, `postgres://user:pass@host:5432/db` or `mysql://user:pass@host:3306/db`. When set, the wizard skips its database step. |
+| `ADMIN_EMAIL` | none | With `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH`, creates the first administrator when the database has none. |
+| `SESSION_SECRET` | generated | Signs the dashboard session cookie. |
+| `STORAGE_KEY` | generated | Encrypts stored bucket credentials. Changing it makes them unreadable. |
+| `APP_NAME` | `Files360` | The name shown in the dashboard and the guides. |
+| `TIMEZONE` | `UTC` | The time zone the dashboard's daily chart counts in. |
+| `MAX_UPLOAD_MB` | `25` | Hard limit for every app. Per-app limits can only be lower. |
+| `MAX_INPUT_PIXELS` | `60000000` | Images above this many pixels are refused, a guard against decompression bombs. |
+| `MAX_CONCURRENT_JOBS` | `2` | Images processed at once. |
+| `MAX_QUEUE` | `50` | Images allowed to wait. Beyond that the API answers `503 busy`. Documents never queue. |
+| `SHARP_THREADS` | `2` | libvips threads per image. |
+| `API_RATE_LIMIT_PER_MIN` | `120` | Requests per minute per app. |
+
+Storage is never configured in the environment. Buckets are connected in the dashboard, verified with a real round trip, and their secrets are encrypted before they reach the database.
+
+## Apps
+
+An app is one website or service that uploads. Each app has:
+
+- **A folder**, fixed at creation. Every object it stores lives under `<folder>/` in the bucket.
+- **Sizes.** Up to eight named variants, each with a width, a height or both, and a fit: `cover` (crop to fill), `contain` (pad), `inside` (fit within, keep ratio), `outside` (cover, keep ratio) or `fill` (stretch). Images are never upscaled.
+- **Format and quality.** WebP, AVIF or JPEG.
+- **Document and archive switches.** Documents are on by default; ZIP archives are off, because a public bucket serves whatever is inside them.
+- **Keep original.** Stores the upload privately next to the sizes, on providers with per-object permissions.
+- **A bucket,** or the default one.
+- **API keys,** created on demand and shown once.
+
+Changing settings only affects new uploads. Object keys contain a hash of the file and the settings, so existing URLs never change and can be cached for a year.
+
+## Backups
+
+Back up `DATA_DIR` and, if you use one, your Postgres or MySQL database. The files themselves are already in your bucket; the database is what knows which file belongs to which app.
+
+---
+
+# Storage providers
+
+Files360 writes to any bucket that speaks the S3 API. Presets fill in the endpoint, the region list and the public URL for the providers below, so connecting one is a bucket name and a key pair. Anything else works through **Other**.
+
+| Provider | | Regions | Per-object ACLs |
+| --- | --- | --- | --- |
+| [Hetzner Object Storage](https://www.hetzner.com) | European buckets, low egress cost. | fsn1, nbg1, hel1 | Yes |
+| [DigitalOcean Spaces](https://www.digitalocean.com) | Spaces with the built-in CDN edge. | 9 regions | Yes |
+| [Amazon S3](https://aws.amazon.com) | The original. Pair it with CloudFront if you want. | 17 regions | Yes |
+| [Cloudflare R2](https://www.cloudflare.com) | No egress fees. Needs a public r2.dev or custom domain. | auto | Bucket-wide only |
+| [Backblaze B2](https://www.backblaze.com) | Cheapest per TB, free egress through Cloudflare. | 6 regions | Bucket-wide only |
+| [Wasabi Hot Cloud Storage](https://wasabi.com) | Flat pricing, no egress charges. | 12 regions | Yes |
+| [Scaleway Object Storage](https://www.scaleway.com) | French provider, S3 compatible. | fr-par, nl-ams, pl-waw | Yes |
+| [MinIO Self-hosted](https://min.io) | Your own S3 server. Path-style URLs. | your own endpoint | Yes |
+| Other S3-compatible | Any provider with an S3 API: Garage, SeaweedFS, Storj, iDrive e2, OVH, Linode, GCS. | your own endpoint | Yes |
+**Other** covers Garage, SeaweedFS, Storj, iDrive e2, OVH, Linode, Google Cloud Storage with HMAC keys and anything else with an S3 endpoint. Self-hosted servers usually need path-style URLs, which the preset turns on.
+
+## Making the bucket public
+
+Files360 hands out public URLs and is never in the read path, so the bucket (or a CDN in front of it) must serve objects to anyone. Each provider's form says how. Saving a connection uploads a test file and fetches it back over the public URL, and warns if that fails.
+
+## Providers without per-object permissions
+
+Cloudflare R2, Backblaze B2 and Garage decide readability per bucket, not per file. On those, an app that keeps original uploads exposes the originals as publicly as the optimized sizes. Use a separate bucket for such an app if that matters.
+
+## Moving an app to another bucket
+
+Change the app's storage in its settings. New uploads go to the new bucket; everything already stored stays where it is, with the same URLs, because every record remembers the bucket it was written to. Deletes always go back to the right one.
+
+## Checking every connection
+
+```bash
+npm run check-storage
+```
+
+Runs the same round trip against every connected bucket and exits non-zero if any fails, which suits a cron job or a monitoring check.
+
+---
+
+# API reference
+
+Every app gets this guide in its dashboard with its own folder, sizes and limits filled in. The values below are the defaults of a new app called `your-app`. The machine-readable version is [openapi.json](/openapi.json).
+
+## Contents
+
+1. How it works
+2. Authentication
+3. Your configuration
+4. Endpoints
+5. Code examples
+6. Errors
+7. Good practices
+
+---
+
+## 1. How it works
+
+Your backend sends a file to the API. For an **image** the service:
+
+1. checks the file and fixes its rotation,
+2. creates every size configured for your app in WebP,
+3. removes metadata (EXIF, GPS),
+4. stores the files on the CDN under your folder `your-app/`,
+5. answers with the public CDN URL of every size.
+
+For a **document** (PDF, Word, Excel, PowerPoint, CSV or text) nothing is re-encoded. The file is stored as it arrived, under the same folder, and you get back one public URL plus a short summary of what is inside it (pages, rows, slides, words).
+
+**SVG** is the exception on the image side: it is rewritten through a strict allowlist first, so scripts, event handlers, external references and entity declarations never reach storage. What is published is the cleaned vector plus the usual raster sizes, drawn at whatever resolution each size needs.
+
+You store the returned `id` and URLs in your own database and use the URLs directly in your pages or apps. File requests go straight to the CDN, never through this API.
+
+Every response has a `kind` field, `"image"` or `"document"`. Check it before you read `variants`.
+
+| | |
+| --- | --- |
+| API base URL | `https://files.example.com/v1` |
+| CDN base URL | `https://your-cdn.example.com` |
+| Your folder | `your-app` |
+
+## 2. Authentication
+
+Every request needs your API key in the `Authorization` header:
+
+```
+Authorization: Bearer f360_xxxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+`X-API-Key: <key>` is accepted as well.
+
+- Keys are created in the Files360 dashboard and shown **only once**. Store the key in an environment variable or secret manager.
+- Use keys **only from your server**. Never put a key in browser JavaScript, a mobile app bundle or a public repository. Browsers and apps upload to your backend, and your backend calls this API.
+- To rotate a key: create a new key in the dashboard, deploy it, then revoke the old one.
+
+Suggested environment variables:
+
+```
+FILES360_API_URL=https://files.example.com
+FILES360_API_KEY=f360_...
+```
+
+Test the connection:
+
+```bash
+curl -s "$FILES360_API_URL/v1/me" -H "Authorization: Bearer $FILES360_API_KEY"
+```
+
+## 3. Your configuration
+
+Every upload produces these sizes:
+
+| Size | Box (px) | Fit | Result |
+| --- | --- | --- | --- |
+| `thumb` | 320 x 320 | cover | cropped to fill the box exactly |
+| `medium` | 800 x auto | inside | fits inside the box, keeps aspect ratio |
+| `large` | 1600 x auto | inside | fits inside the box, keeps aspect ratio |
+
+Images are never upscaled, so a size can come out smaller than its box. A 600 px wide photo stays 600 px wide in the larger sizes.
+
+| Setting | Value |
+| --- | --- |
+| Output format | WebP |
+| Quality | 80 |
+| Max file size | 15 MB |
+| Max resolution | 60 megapixels |
+| Accepted images | JPEG, PNG, WebP, GIF, AVIF, TIFF, SVG |
+| Accepted documents | PDF, DOCX, DOC, XLSX, XLS, PPTX, PPT, CSV, TXT |
+| Accepted archives | None. ZIP uploads answer `415 archives_disabled`. |
+| Original kept | No. Only the optimized sizes are stored. |
+| Rate limit | 120 requests per minute |
+
+HEIC files from iPhones are not accepted. Web browsers on iOS usually convert photos to JPEG when uploading through a file input. Native apps should export JPEG before sending.
+
+Settings can change over time. Call `GET /v1/me` to read the current configuration from code.
+
+## 4. Endpoints
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/v1/me` | Returns your app configuration. Use it to test a key. |
+| `POST` | `/v1/files` | Uploads a file (multipart): an image is optimized, a document is stored as is. |
+| `POST` | `/v1/files/from-url` | Downloads a file from a public URL and handles it the same way. |
+| `GET` | `/v1/files` | Lists your files, newest first. |
+| `GET` | `/v1/files/:id` | Returns one file. |
+| `DELETE` | `/v1/files/:id` | Deletes a file and everything stored for it. |
+
+### Upload a file
+
+`POST /v1/files` with `multipart/form-data`:
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `file` | yes | The image or document file. |
+| `folder` | no | Sub folder inside your app folder, e.g. `products` or `users/avatars`. Lowercase `a-z`, `0-9`, `-`, `_`, up to 5 levels. |
+| `ref` | no | Your own reference, e.g. a product or user id (max 120 characters). Lets you find files later with `GET /v1/files?ref=`. |
+
+```bash
+curl -X POST "$FILES360_API_URL/v1/files" \
+  -H "Authorization: Bearer $FILES360_API_KEY" \
+  -F "file=@./IMG_2231.jpg" \
+  -F "folder=products" \
+  -F "ref=product-1042"
+```
+
+Response `201 Created`:
+
+```json
+{
+  "id": "66f1c2a9e4b0a1d2c3f4e5a6",
+  "kind": "image",
+  "folder": "products",
+  "ref": "product-1042",
+  "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "input": {
+    "name": "IMG_2231.jpg",
+    "format": "jpeg",
+    "width": 4032,
+    "height": 3024,
+    "bytes": 3482112
+  },
+  "variants": {
+    "thumb": {
+      "url": "https://your-cdn.example.com/your-app/products/3f9a1c7e5b2d8a4f6e0c9b1d/thumb.webp",
+      "width": 320,
+      "height": 320,
+      "bytes": 7168,
+      "format": "webp"
+    },
+    "medium": {
+      "url": "https://your-cdn.example.com/your-app/products/3f9a1c7e5b2d8a4f6e0c9b1d/medium.webp",
+      "width": 800,
+      "height": 600,
+      "bytes": 33600,
+      "format": "webp"
+    },
+    "large": {
+      "url": "https://your-cdn.example.com/your-app/products/3f9a1c7e5b2d8a4f6e0c9b1d/large.webp",
+      "width": 1600,
+      "height": 1200,
+      "bytes": 134400,
+      "format": "webp"
+    }
+  },
+  "srcset": "https://your-cdn.example.com/your-app/products/3f9a1c7e5b2d8a4f6e0c9b1d/medium.webp 800w, https://your-cdn.example.com/your-app/products/3f9a1c7e5b2d8a4f6e0c9b1d/large.webp 1600w",
+  "bytesOut": 175168,
+  "createdAt": "2026-01-15T10:24:00.000Z",
+  "duplicate": false
+}
+```
+
+- `variants.<size>.url` is the public CDN URL of each size.
+- `srcset` is ready to use in an `<img>` tag. Cropped sizes are left out because their aspect ratio differs.
+- Uploading the **same file into the same folder again** returns the existing record with status `200` and `"duplicate": true`. Retrying an upload is always safe.
+
+### Upload a document
+
+Same endpoint, same fields. A document is stored as it arrives instead of being resized, and comes back with one URL and a summary of what is inside it.
+
+```bash
+curl -X POST "$FILES360_API_URL/v1/files" \
+  -H "Authorization: Bearer $FILES360_API_KEY" \
+  -F "file=@./rental-terms.pdf" \
+  -F "folder=contracts" \
+  -F "ref=booking-5521"
+```
+
+Response `201 Created`:
+
+```json
+{
+  "id": "66f1c2a9e4b0a1d2c3f4e5a7",
+  "kind": "document",
+  "folder": "contracts",
+  "ref": "booking-5521",
+  "hash": "9f2b4c8d1e0a7f6b3c5d8e2a4b6c9d1e3f5a7b9c1d3e5f7a9b1c3d5e7f9a1b3c",
+  "input": {
+    "name": "rental-terms.pdf",
+    "format": "pdf",
+    "bytes": 184320
+  },
+  "file": {
+    "url": "https://your-cdn.example.com/your-app/contracts/8b1f0c2ad4e69137aa02c5be/rental-terms.pdf",
+    "name": "rental-terms.pdf",
+    "mime": "application/pdf",
+    "bytes": 184320
+  },
+  "preview": {
+    "kind": "pdf",
+    "pages": 12
+  },
+  "bytesOut": 184320,
+  "createdAt": "2026-01-15T10:26:00.000Z",
+  "duplicate": false
+}
+```
+
+- `file.url` is the public CDN URL. It is the only URL a document has: there are no sizes and no `srcset`.
+- The file is byte for byte the one you sent. PDFs open in the browser, the other types download.
+- `preview` is a summary read once at upload time. Its fields depend on the type:
+
+| Type | What `preview` holds |
+| --- | --- |
+| PDF | `pages` |
+| XLSX, CSV | `rows`, `columns`, and `sheets` for a workbook |
+| DOCX | `words`, paragraph count |
+| PPTX | `slides` |
+| TXT | `lines` |
+| ZIP | `entries`, `unpackedBytes` |
+| DOC, XLS, PPT | `pages`, `words`, `slides` when the file carries document properties, plus `macros: true` when it holds VBA |
+
+The 97-2003 formats are stored and served like any other file; only their properties are read, so the library shows a summary card rather than the contents.
+- The last part of the URL is your file name, cleaned up to lowercase letters, digits, `.`, `-` and `_`.
+
+### Import from a URL
+
+`POST /v1/files/from-url` with a JSON body. Useful for migrating files you already host somewhere.
+
+```bash
+curl -X POST "$FILES360_API_URL/v1/files/from-url" \
+  -H "Authorization: Bearer $FILES360_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/photo.jpg", "folder": "products", "ref": "product-1042"}'
+```
+
+The URL must be public (http or https). Images and documents both work: what comes back is decided by the bytes that arrive, not by the extension in the URL. The response is the same as for a file upload.
+
+### List files
+
+`GET /v1/files?page=1&limit=50&folder=products&ref=product-1042`
+
+All parameters are optional. `limit` goes up to 200. Images and documents come back in the same list, told apart by `kind`.
+
+```json
+{ "page": 1, "limit": 50, "total": 132, "items": [ { "id": "...", "variants": { } } ] }
+```
+
+### Get one file
+
+`GET /v1/files/:id` returns the same object as the upload, image or document.
+
+### Delete a file
+
+```bash
+curl -X DELETE "$FILES360_API_URL/v1/files/66f1c2a9e4b0a1d2c3f4e5a6" \
+  -H "Authorization: Bearer $FILES360_API_KEY"
+```
+
+Response `204 No Content`. Every size, or the document itself, is removed from storage. Copies already cached by the CDN edge can stay reachable for a short time.
+
+## 5. Code examples
+
+### Node.js 20+: upload a file from disk
+
+```js
+const fs = require('node:fs/promises');
+const path = require('node:path');
+
+async function uploadImage(filePath, { folder, ref } = {}) {
+  const form = new FormData();
+  form.append('file', new Blob([await fs.readFile(filePath)]), path.basename(filePath));
+  if (folder) form.append('folder', folder);
+  if (ref) form.append('ref', ref);
+
+  const res = await fetch(process.env.FILES360_API_URL + '/v1/files', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },
+    body: form,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error.code + ': ' + data.error.message);
+  return data;
+}
+
+uploadImage('./IMG_2231.jpg', { folder: 'products', ref: 'product-1042' })
+  .then((image) => console.log(image.variants.large.url));
+```
+
+### Node.js with Express: forward a user upload
+
+The browser uploads to your app as usual, your route forwards the file.
+
+```js
+const express = require('express');
+const multer = require('multer');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
+
+const router = express.Router();
+
+router.post('/products/:id/photos', upload.single('photo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No photo received' });
+
+  const form = new FormData();
+  form.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
+  form.append('folder', 'products');
+  form.append('ref', req.params.id);
+
+  const apiRes = await fetch(process.env.FILES360_API_URL + '/v1/files', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },
+    body: form,
+  });
+  const image = await apiRes.json();
+  if (!apiRes.ok) return res.status(apiRes.status).json(image);
+
+  // Save what you need on your own record, for example:
+  // await Product.updateOne(
+  //   { _id: req.params.id },
+  //   { $push: { photos: { imageId: image.id, thumb: image.variants.thumb.url, large: image.variants.large.url, srcset: image.srcset } } }
+  // );
+
+  res.status(201).json(image);
+});
+
+module.exports = router;
+```
+
+### Node.js: delete when your record is deleted
+
+```js
+async function deleteImage(imageId) {
+  const res = await fetch(process.env.FILES360_API_URL + '/v1/files/' + imageId, {
+    method: 'DELETE',
+    headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },
+  });
+  if (res.status !== 204 && res.status !== 404) {
+    const data = await res.json();
+    throw new Error(data.error.message);
+  }
+}
+```
+
+### PHP (WordPress, Laravel or plain PHP) with cURL
+
+```php
+<?php
+function upload_image(string $path, string $folder = '', string $ref = ''): array
+{
+    $fields = ['file' => new CURLFile($path, mime_content_type($path), basename($path))];
+    if ($folder !== '') $fields['folder'] = $folder;
+    if ($ref !== '') $fields['ref'] = $ref;
+
+    $ch = curl_init(getenv('FILES360_API_URL') . '/v1/files');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . getenv('FILES360_API_KEY')],
+        CURLOPT_POSTFIELDS => $fields,
+    ]);
+    $body = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    if ($body === false) {
+        throw new RuntimeException('Image API unreachable: ' . curl_error($ch));
+    }
+    $data = json_decode($body, true);
+    if ($status >= 400) {
+        throw new RuntimeException($data['error']['code'] . ': ' . $data['error']['message']);
+    }
+    return $data;
+}
+
+$image = upload_image('/tmp/IMG_2231.jpg', 'products', 'product-1042');
+echo $image['variants']['large']['url'];
+```
+
+### HTML: responsive image
+
+```html
+<img
+  src="https://.../large.webp"
+  srcset="(value of image.srcset)"
+  sizes="(max-width: 768px) 100vw, 800px"
+  width="1600" height="1200"
+  loading="lazy"
+  alt="Describe the image">
+```
+
+Set `width` and `height` from the returned size to avoid layout shift.
+
+## 6. Errors
+
+Errors always return JSON in this shape:
+
+```json
+{ "error": { "code": "file_too_large", "message": "File exceeds the 15 MB limit" } }
+```
+
+Use `code` in your logic, show or log `message`.
+
+| Status | Code | Meaning | Retry? |
+| --- | --- | --- | --- |
+| 400 | `missing_file` | No `file` field in the multipart body | No |
+| 400 | `invalid_upload` | More than one file or a wrong field name | No |
+| 400 | `invalid_folder` / `invalid_ref` | Folder or ref has invalid characters or length | No |
+| 400 | `invalid_url` / `blocked_url` / `fetch_failed` | URL import could not download the file | No |
+| 400 | `invalid_json` | JSON body could not be parsed | No |
+| 401 | `missing_api_key` / `invalid_api_key` | Key missing, wrong or revoked | No |
+| 403 | `app_disabled` | The app is disabled in the dashboard | No |
+| 404 | `not_found` | Image does not exist or belongs to another app | No |
+| 413 | `file_too_large` / `image_too_large` | Above 15 MB or 60 megapixels | No |
+| 415 | `unsupported_image` / `unsupported_format` / `heic_not_supported` | Not an accepted image | No |
+| 415 | `unsupported_document` | A recognised but unsupported document, e.g. .pptx, .doc or a macro-enabled workbook | No |
+| 415 | `documents_disabled` | This app takes images only | No |
+| 415 | `archives_disabled` | This app does not accept ZIP archives | No |
+| 422 | `processing_failed` | The image is corrupt | No |
+| 429 | `rate_limited` | More than 120 requests in a minute | Yes, after 60 s |
+| 502 | `storage_error` | Storage did not accept the files | Yes, with backoff |
+| 503 | `busy` | Too many images in the processing queue. Documents never queue | Yes, with backoff |
+| 504 | `fetch_timeout` | URL import timed out | Yes |
+
+For retries, wait 1 s, then 2 s, then 4 s, and stop after 4 attempts. Uploads are deduplicated, so a retry never creates a second copy.
+
+## 7. Good practices
+
+- **Store the id.** Save `id` together with the URLs you use, so you can delete the file when your record is deleted.
+- **Branch on `kind`.** `image` gives you `variants` and `srcset`, `document` gives you `file.url`.
+- **URLs never change.** They are cached for a year. To replace a file, upload the new one, save its URLs, then delete the old record.
+- **Use folders for structure,** e.g. `products`, `users/avatars`, `events/2026`. Folders only group files, they have no permissions.
+- **Use `ref`** to link files to your own records and find them with `GET /v1/files?ref=...`.
+- **Keep uploads server side** and protect your own upload route (auth, size limit, rate limit).
+- **Set a timeout** of about 60 seconds on upload requests. Large photos take a few seconds to process.
+
+---
+
+# Security
+
+Files360 accepts files from the internet and parses them, so most of its design is about what an upload is allowed to become.
+
+## What reaches storage
+
+- **File types are decided from the bytes,** never the file name or the declared MIME type.
+- **SVG is rewritten through an allowlist** before it is stored and before it is rasterized: scripts, event handlers, `foreignObject`, entity declarations and any reference that is not a document anchor or a `data:` image are removed. The library records what was taken out.
+- **Images are re-encoded** with metadata stripped, below a pixel limit that defeats decompression bombs. HEIC is refused.
+- **Documents are stored byte for byte.** Their previews come from hand-written ZIP and compound-file readers that cap every read, so a crafted archive cannot expand without bound. Macro-enabled OOXML is refused. Archives are off per app until turned on.
+- **URL imports** refuse private and link-local addresses and re-check every redirect and every resolved address, against DNS rebinding.
+
+The parsers are written without dependencies on purpose: each library would be another supply-chain surface on a service that parses hostile input.
+
+## Keys and secrets
+
+- API keys are shown once and stored only as SHA-256 hashes. They are rate limited per app and can be revoked from the app's Keys tab.
+- Bucket credentials are encrypted with AES-256-GCM before they reach the database.
+- The session secret and the storage key are generated on first start into `data/secrets.json`, readable only by the service's user.
+
+## The dashboard
+
+- One administrator account, bcrypt-hashed, with a login rate limit.
+- CSRF tokens on every form, `SameSite` cookies, Helmet headers and a Content-Security-Policy that only admits your buckets' origins.
+
+## The setup wizard
+
+An unconfigured install is the most dangerous moment in a self-hosted app's life. The wizard only answers to a browser that has entered the one-time token printed in the server log, writes nothing until its last step, and closes for good once there is a configuration and an administrator. After that `/setup` is a 404.
+
+## Reporting a vulnerability
+
+Use GitHub's private vulnerability reporting on [dot360io/Files360](https://github.com/dot360io/Files360/security/advisories/new). Please do not open a public issue. See [SECURITY.md](https://github.com/dot360io/Files360/blob/main/SECURITY.md) for scope and response times.
+
+---
+
+# Migrating from Cloudinary
+
+This guide moves an existing Cloudinary library into a Files360 app. Files are copied through the public Files360 API with `scripts/import-from-cloudinary.js`. That script also writes a mapping file, so you can rewrite the URLs your own database already holds.
+
+## What moves and what does not
+
+**Moves:**
+
+- Images (JPEG, PNG, WebP, GIF, AVIF, TIFF, SVG). Each one is optimised into every size configured for the app.
+- Raw files Files360 accepts as documents or archives (PDF, DOCX, XLSX, PPTX, CSV, TXT, ZIP and the 97-2003 Office formats, depending on the app's settings). They are stored byte for byte.
+- Folder structure, mapped onto Files360 folder rules.
+- The Cloudinary `public_id`, kept as each file's `ref` so you can find it again.
+
+**Does not move:**
+
+- **On-the-fly transformations.** Files360 renders a fixed set of named sizes when a file is uploaded. It does not build a new rendition from parameters in the URL. Signed transform URLs are on the roadmap, but until they arrive every size you need has to be configured on the app first.
+- **Video and audio.** Files360 does not store video. The script lists these assets and reports them as skipped.
+- **Private and authenticated assets.** They can only be downloaded with a signed URL, and the script lists `upload` delivery type assets only.
+- **Tags, context metadata, moderation status and structured metadata.** Only the file, its folder and its `public_id` are carried over.
+- **HEIC.** Files360 does not accept HEIC, so those uploads fail with `415` and are listed at the end of the run.
+
+## Concept map
+
+| Cloudinary | Files360 |
+| --- | --- |
+| Cloud (`cloud_name`) | A Files360 instance, with its own S3-compatible bucket |
+| Upload preset, root folder | An app (one app folder, one set of sizes, one API key or more) plus an optional sub folder |
+| Folder, `asset_folder` | `folder` on the file, up to 5 levels inside the app folder |
+| `public_id` | `id` (assigned by Files360) plus `ref` (your own reference, here the old `public_id`) |
+| Named transformations, eager transformations | Named variants configured per app, rendered once at upload |
+| `f_auto`, `q_auto` | The app's output format (WebP, AVIF or JPEG) and quality setting |
+| `secure_url` | `variants.<name>.url` for each size, plus `srcset` ready for an `<img>` tag; `file.url` for a document |
+| Admin API listing | `GET /v1/files`, filtered by `folder` or `ref` |
+
+## Mapping transformations onto variants
+
+Look at the transformation strings your site actually uses (search your templates for `/upload/` URLs) and turn each distinct one into a variant on the app. A variant has a name, a width, a height and a fit.
+
+| Cloudinary crop | Files360 fit | Notes |
+| --- | --- | --- |
+| `c_fill` | `cover` | Fills the box exactly and crops the overflow, centred. |
+| `c_limit` | `inside` | Fits within the box, never upscaled. |
+| `c_fit` | `inside` | Files360 never upscales, so `c_fit` and `c_limit` behave the same. |
+| `c_pad` | `contain` | Fits within the box and pads the rest. |
+| `c_scale` with width and height | `fill` | Stretches to the exact box, ignoring aspect ratio. |
+| `c_scale` with one dimension | `inside` | Set only that dimension. |
+
+Gravity options such as `g_face` or `g_auto` have no equivalent: cropped sizes are centred.
+
+An example set of variants for a shop that used three Cloudinary transformations:
+
+| Cloudinary transformation | Variant name | Width | Height | Fit |
+| --- | --- | --- | --- | --- |
+| `c_fill,w_320,h_320` | `thumb` | 320 | 320 | `cover` |
+| `c_limit,w_800` | `medium` | 800 | | `inside` |
+| `c_limit,w_1600` | `large` | 1600 | | `inside` |
+| `c_pad,w_600,h_600,b_white` | `square` | 600 | 600 | `contain` |
+| `f_auto,q_auto` | (app settings) | | | Output format WebP, quality 80 |
+
+Cropped sizes (`cover`, `fill`) are left out of `srcset`, because their aspect ratio differs from the original.
+
+Variants are part of the object key, so changing them later never rewrites a URL you have already published. Files uploaded after the change get the new sizes, and files already stored keep theirs.
+
+## Step by step
+
+### 1. Create the app and its variants
+
+In the Files360 dashboard, create an app for the library and set its sizes, output format, quality and maximum upload size to match the table you drew up above. Do this **before** importing: sizes are rendered at upload time. If the library holds PDFs or ZIP files, turn on documents or archives on the app as well.
+
+### 2. Generate an API key
+
+Under the app, create a key and keep it somewhere safe; it is shown only once. Check it works:
+
+```bash
+curl -s "$FILES360_API_URL/v1/me" -H "Authorization: Bearer $FILES360_API_KEY"
+```
+
+### 3. Dry run
+
+Your Cloudinary API environment variable is in the Cloudinary console under API Keys and looks like `cloudinary://<key>:<secret>@<cloud>`.
+
+```bash
+CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud> \
+FILES360_API_URL=https://files.example.com \
+FILES360_API_KEY=f360_... \
+node scripts/import-from-cloudinary.js --type=all --dry-run
+```
+
+The dry run lists every asset and the Files360 folder it would land in, without calling Files360. Folder names are lowercased, anything other than `a-z`, `0-9`, `-` and `_` becomes `-`, empty segments are dropped, and the result is cut to 5 levels and 100 characters. If the mapping is not what you want, reorganise in Cloudinary first, or import one prefix at a time with `--prefix=`.
+
+Listing uses the Cloudinary Admin API, which is rate limited per hour (500 calls an hour on the free plan). Each call returns up to 500 assets, so even a large library needs few calls. When the limit is hit, the script waits for the reset time Cloudinary reports and carries on.
+
+### 4. Import
+
+Run the same command without `--dry-run`:
+
+```bash
+node scripts/import-from-cloudinary.js --type=all --concurrency=3
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--prefix=folder/` | none | Only assets whose `public_id` starts with this |
+| `--type=` | `image` | `image`, `raw`, or `all` (also lists video so it can be reported) |
+| `--concurrency=` | `3` | Imports in parallel, 1 to 10. Keep it under your app's rate limit. |
+| `--dry-run` | off | List only, nothing is imported |
+| `--state=` | `.cloudinary-import.json` | Resume file |
+| `--map=` | `cloudinary-map.csv` | Mapping file |
+| `--restart` | off | List from the beginning again; files already done stay skipped |
+
+Each asset is sent to `POST /v1/files/from-url` with its `secure_url`, the mapped folder and the `public_id` as `ref`. Responses `429`, `502`, `503` and `504` are retried with backoff. Permanent failures such as `415` (type not accepted) or `413` (too large) are logged and counted, and the run goes on. The run ends with a summary of imported, duplicates, skipped (video) and failed.
+
+### 5. Rewrite your URLs
+
+`cloudinary-map.csv` has one row per imported file:
+
+| Column | Holds |
+| --- | --- |
+| `public_id` | The Cloudinary `public_id` |
+| `resource_type` | `image` or `raw` |
+| `files360_id` | The Files360 `id`; store it to fetch or delete the file later |
+| `kind` | `image` or `document` |
+| `primary_url` | The largest variant's URL for an image, `file.url` for a document |
+
+Use it to update the URLs in your own database. For images, it is usually better to store the `id` and read the URL for each size from `GET /v1/files/:id`, or to replace each Cloudinary transformation in your templates with the matching variant. You can also look a file up by its old `public_id` with `GET /v1/files?ref=<public_id>`.
+
+Values that start with `=`, `+`, `-` or `@` are written with a leading apostrophe, so a spreadsheet does not run them as formulas. Strip it if you read the file from code.
+
+### 6. Switch over, then retire Cloudinary
+
+Keep Cloudinary running until every URL in your database, templates, emails and cached pages points at Files360. Old links keep working until then. Once traffic to Cloudinary has stopped, run the script once more to pick up anything uploaded in the meantime, and only then delete the Cloudinary assets.
+
+## FAQ
+
+**Is it safe to run the script more than once?**
+Yes. Files360 answers `200` with `"duplicate": true` for a file it already holds in the same folder, so nothing is stored twice. The state file also records the listing cursor and every `public_id` already done, so an interrupted run carries on from the last full page. Files that failed with a temporary error are retried first on the next run. Delete the state file to start over from scratch.
+
+**What about private or authenticated Cloudinary assets?**
+They are not covered. Files360 downloads from a public URL, and these assets need a signed delivery URL. Make them public for the duration of the import, or download them yourself and send them with `POST /v1/files`.
+
+**Are SVG files safe to import?**
+Yes. Every SVG is rewritten through a strict allowlist before it is stored and before it is rasterised, so scripts, event handlers, external references and entity declarations never reach your bucket. Raster sizes are rendered from the cleaned file.
+
+**Why did my HEIC files fail?**
+Files360 does not accept HEIC. Convert them to JPEG and upload them with `POST /v1/files`, or let Cloudinary deliver a JPEG by importing from a URL with `f_jpg` in it.
+
+**Why are some files in a different folder from Cloudinary?**
+Files360 folders allow lowercase `a-z`, `0-9`, `-` and `_` only, up to 5 levels and 100 characters. The dry run shows the mapping for every asset before anything is imported.
+
+**Why are images that were small in Cloudinary still small?**
+Files360 never upscales. A 600 px wide original stays 600 px wide in the larger sizes.

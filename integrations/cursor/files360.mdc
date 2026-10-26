@@ -1,0 +1,75 @@
+---
+description: Integrating with the Files360 upload API (uploads, CDN URLs, srcset, f360_ API keys). Apply when writing code that calls Files360 or stores its file records.
+globs:
+alwaysApply: false
+---
+
+# Files360 integration
+
+Files360 is a self-hosted upload API. Images are optimised into the app's configured sizes; documents and archives are stored as they arrive. Files are served from a CDN.
+
+## Configuration and keys
+
+- Read `FILES360_API_URL` (base address, no `/v1`) and `FILES360_API_KEY` (`f360_<12 hex>_<48 hex>`) from the environment or a secret manager. Never hard-code either.
+- The key is server-side only. Never ship it in browser JavaScript, a mobile bundle or a public repository. Browsers upload to our backend; our backend calls Files360.
+- Header: `Authorization: Bearer <key>`.
+
+## Endpoints (all under `/v1`)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/me` | App settings: `folder`, `format`, `maxUploadMB`, `variants`, `accepts`. |
+| POST | `/files` | multipart: `file` (required), `folder`, `ref`. `201`, or `200` with `"duplicate": true`. |
+| POST | `/files/from-url` | JSON `{ url, folder, ref }`. Same response as an upload. |
+| GET | `/files` | `?page&limit(<=200)&folder&ref` returns `{ page, limit, total, items }`. |
+| GET | `/files/:id` | One file. |
+| DELETE | `/files/:id` | `204`, no body. Treat `404` as already gone. |
+
+`folder`: lowercase `a-z0-9-_`, up to 5 levels joined by `/`. `ref`: our own record id, up to 120 characters.
+
+## Responses
+
+Branch on `kind` before reading fields:
+
+- `image`: `variants[name] = { url, width, height, bytes, format }` and `srcset` (cropped sizes excluded). SVG also has `file.url`.
+- `document`: `file = { url, name, mime, bytes }` and `preview` (pages, rows, slides, words). No variants, no srcset.
+
+Persist `id` with the URLs we use. URLs are immutable and cached for a year: to replace a file, upload the new one, save its URLs, then delete the old id. Set `width` and `height` on `<img>` from the returned variant, since images are never upscaled.
+
+Same bytes into the same folder returns the existing record (`duplicate: true`), so retries are safe.
+
+## Errors
+
+Shape: `{ "error": { "code", "message" } }`. Branch on `code`, log or show `message`.
+
+- `413 file_too_large` / `image_too_large`: reject client-side against `maxUploadMB` too.
+- `415 unsupported_*`, `heic_not_supported`, `documents_disabled`, `archives_disabled`: type is decided from bytes; do not retry.
+- `429 rate_limited`: retry after 60 s.
+- `502 storage_error`, `503 busy`: retry with 1 s, 2 s, 4 s backoff, at most 4 attempts.
+- `503 storage_unconfigured`: operator must connect storage; do not retry.
+
+Use a 60 s timeout on uploads.
+
+## Node 20+ example
+
+```js
+const fs = require('node:fs/promises');
+const path = require('node:path');
+
+async function uploadToFiles360(filePath, { folder, ref } = {}) {
+  const form = new FormData();
+  form.append('file', new Blob([await fs.readFile(filePath)]), path.basename(filePath));
+  if (folder) form.append('folder', folder);
+  if (ref) form.append('ref', ref);
+
+  const res = await fetch(`${process.env.FILES360_API_URL}/v1/files`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.FILES360_API_KEY}` },
+    body: form,
+    signal: AbortSignal.timeout(60_000),
+  });
+  const data = await res.json();
+  if (!res.ok) throw Object.assign(new Error(data.error.message), { code: data.error.code, status: res.status });
+  return data; // check data.kind
+}
+```

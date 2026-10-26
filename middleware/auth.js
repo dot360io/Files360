@@ -1,6 +1,5 @@
 const crypto = require('crypto');
-const App = require('../models/App');
-const Bucket = require('../models/Bucket');
+const db = require('../db');
 const { HttpError } = require('../utils/errors');
 
 function csrf(req, res, next) {
@@ -39,8 +38,8 @@ function requireAdmin(req, res, next) {
 // Apps for the sidebar and the upload dialog
 async function loadNav(req, res, next) {
   const [navApps, storageCount] = await Promise.all([
-    App.find({}, 'name slug active maxUploadMB allowDocuments allowArchives').sort({ name: 1 }).lean(),
-    Bucket.countDocuments({ active: true }),
+    db.apps.list(),
+    db.buckets.count({ active: true }),
   ]);
   res.locals.navApps = navApps;
   // Drives the warning dot next to Storage when nothing is connected

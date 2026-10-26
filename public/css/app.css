@@ -811,3 +811,34 @@ details.panel[open] > summary::after { transform: rotate(-135deg); }
   .bucket-foot { flex-direction: column; align-items: flex-start; }
   .bucket-foot .asset-link { max-width: 100%; }
 }
+
+/* ---------- Setup wizard ---------- */
+.setup { min-height: 100vh; display: flex; flex-direction: column; }
+.setup-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 28px; background: linear-gradient(180deg, var(--navy-900) 0%, var(--navy-950) 100%); color: #fff; }
+.setup-head .brand { padding: 0; color: #fff; }
+.setup-steps { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; margin: 0; padding: 0; font-size: 13px; color: var(--navy-text); }
+.setup-steps li { display: flex; align-items: center; gap: 8px; }
+.setup-steps .is-current { color: #fff; font-weight: 600; }
+.setup-step-num { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--navy-700); font-size: 11px; font-weight: 700; }
+.setup-step-num .icon { width: 13px; height: 13px; }
+.setup-steps .is-current .setup-step-num { background: var(--primary); border-color: var(--primary); color: #fff; }
+.setup-steps .is-done .setup-step-num { background: var(--navy-700); color: #fff; }
+.setup-body { flex: 1; padding: 40px 16px; }
+.setup-card { width: min(560px, 100%); margin: 0 auto; padding: 28px; }
+.setup-card h1 { font-size: 22px; margin-bottom: 6px; }
+.setup-card .lead { color: var(--muted); margin-bottom: 22px; }
+.setup-wide { width: min(1080px, 100%); margin: 0 auto; }
+.setup-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 8px; }
+.setup-actions form { margin: 0; }
+.setup-choices { border: 0; padding: 0; margin: 0 0 18px; display: grid; gap: 8px; }
+.setup-choices legend { font-weight: 600; margin-bottom: 8px; }
+.setup-choice { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; font-weight: 400; }
+.setup-choice:has(input:checked) { border-color: var(--primary); background: var(--primary-50); }
+.setup-choice input { margin-top: 3px; accent-color: var(--primary); }
+.setup-choice small { display: block; color: var(--muted); font-size: 12.5px; word-break: break-word; }
+.setup-next { margin: 0 0 22px; padding-left: 18px; color: var(--text-2); display: grid; gap: 6px; }
+@media (max-width: 720px) {
+  .setup-head { padding: 16px; }
+  .setup-card { padding: 20px; }
+  .setup-card .fields-2 { grid-template-columns: 1fr; }
+}

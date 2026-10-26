@@ -14,9 +14,11 @@ everything lands on the operator's own S3-compatible bucket.
 
 ```bash
 npm install
-npm run dev              # watch mode on http://127.0.0.1:4360
-npm test                 # node:test, no database or network needed
+npm run dev              # watch mode on http://127.0.0.1:4360 (setup wizard on first run)
+npm test                 # node:test, in-memory SQLite, no database server or network
 npm run check-storage    # round-trips every connected bucket
+npm run docs:generate    # rewrites the generated docs (API page, openapi.json, llms.txt, provider tables)
+npm run docs:dev         # the files360.dev site, VitePress
 ```
 
 ## House style
@@ -50,11 +52,16 @@ The codebase has a voice. Match it rather than introducing a new one.
    and the render settings. Changing settings must never rewrite an existing object.
 4. **Parsers fail closed and stay capped.** Every read out of a ZIP or compound file
    is bounded. If you cannot bound it, do not read it.
-5. **`/v1/images` keeps working.** It is published; new paths are added as aliases.
+5. **Published API paths never break.** `/v1/files` is the API; new behaviour is
+   added alongside it, never by changing what an existing path or field means.
+6. **Only `db/` talks to the database.** Controllers call repositories; anything
+   engine-specific belongs in `db/` and needs a test in `test/db.test.js`.
 
 ## Testing
 
-`test/` runs on the built-in `node:test` runner with no database and no network.
+`test/` runs on the built-in `node:test` runner with no database server and no network:
+repository tests use in-memory SQLite, and `TEST_DATABASE_URL` points them at Postgres
+or MySQL instead.
 Changes to `utils/zip.js`, `utils/cfb.js`, `utils/svg.js` or `utils/documents.js`
 need tests — they parse hostile input for a living. There are no binary fixtures: `test/helpers/`
 builds the ZIP and compound-file samples in memory from readable XML, so you can

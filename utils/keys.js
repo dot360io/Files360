@@ -1,15 +1,15 @@
 const crypto = require('crypto');
 
-// Key format: img_<12 hex prefix>_<48 hex secret>
+// Key format: f360_<12 hex prefix>_<48 hex secret>
 // The prefix is stored in clear for lookup, the full key only as a SHA-256 hash.
-const KEY_RE = /^img_([a-f0-9]{12})_([a-f0-9]{48})$/;
+const KEY_RE = /^f360_([a-f0-9]{12})_([a-f0-9]{48})$/;
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 function generateKey() {
   const prefix = crypto.randomBytes(6).toString('hex');
   const secret = crypto.randomBytes(24).toString('hex');
-  const key = `img_${prefix}_${secret}`;
+  const key = `f360_${prefix}_${secret}`;
   return { key, prefix, hash: sha256(key), last4: secret.slice(-4) };
 }
 

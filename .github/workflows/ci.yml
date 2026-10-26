@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The API page, openapi.json, llms.txt and provider tables are generated
+      # from the code; this fails when someone edits one without the other
+      - run: node scripts/build-docs.js --check
+      - run: npx vitepress build docs
+
+  mcp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  databases:
+    name: ${{ matrix.engine }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: postgres
+            url: postgres://files360:files360@127.0.0.1:5432/files360
+          - engine: mysql
+            url: mysql://files360:files360@127.0.0.1:3306/files360
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: files360
+          POSTGRES_PASSWORD: files360
+          POSTGRES_DB: files360
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U files360" --health-interval 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: files360
+          MYSQL_USER: files360
+          MYSQL_PASSWORD: files360
+          MYSQL_ROOT_PASSWORD: root
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot" --health-interval 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Only the repository tests take a database; everything else is engine-free
+      - run: node --test test/db.test.js
+        env:
+          TEST_DATABASE_URL: ${{ matrix.url }}
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: files360:ci
+      # The image has to boot into the wizard and answer its own healthcheck
+      - run: |
+          docker run -d --name f360 -p 4360:4360 files360:ci
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:4360/health && break; sleep 1; done
+          docker logs f360 | grep -q "setup?token="
+          curl -fs http://127.0.0.1:4360/health | grep -q '"setup":true'
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm audit --omit=dev --audit-level=high

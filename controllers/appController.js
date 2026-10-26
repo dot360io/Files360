@@ -1,8 +1,5 @@
 const config = require('../config/env');
-const App = require('../models/App');
-const ApiKey = require('../models/ApiKey');
-const Image = require('../models/Image');
-const Bucket = require('../models/Bucket');
+const db = require('../db');
 const storage = require('../utils/storage');
 const { ingest } = require('../utils/assetPipeline');
 const { generateKey } = require('../utils/keys');
@@ -13,7 +10,7 @@ const v = require('../utils/validate');
 async function createKey(appDoc, label) {
   const k = generateKey();
   const cleanLabel = String(label || '').trim().slice(0, 60) || 'default';
-  await ApiKey.create({ app: appDoc._id, label: cleanLabel, prefix: k.prefix, hash: k.hash, last4: k.last4 });
+  await db.keys.create({ app: appDoc._id, label: cleanLabel, prefix: k.prefix, hash: k.hash, last4: k.last4 });
   return { key: k.key, label: cleanLabel };
 }
 
@@ -42,19 +39,16 @@ async function withStorage(locals, appDoc) {
 // Apps list
 
 exports.index = async (req, res) => {
-  const apps = await App.find().sort({ name: 1 }).lean();
-  const [keyCounts, previews] = await Promise.all([
-    ApiKey.aggregate([{ $match: { revokedAt: null } }, { $group: { _id: '$app', count: { $sum: 1 } } }]),
-    Promise.all(
-      apps.map((a) => Image.find({ app: a._id }, 'kind variants input.format').sort({ createdAt: -1 }).limit(4).lean())
-    ),
+  const apps = await db.apps.list();
+  const [keysByApp, previews] = await Promise.all([
+    db.keys.activeCounts(),
+    Promise.all(apps.map((a) => db.assets.recent({ appId: a._id, limit: 4 }))),
   ]);
-  const keysByApp = new Map(keyCounts.map((k) => [String(k._id), k.count]));
 
   res.render('apps/index', {
     title: 'Apps',
     section: 'apps',
-    apps: apps.map((a, i) => ({ ...a, keyCount: keysByApp.get(String(a._id)) || 0, previews: previews[i] })),
+    apps: apps.map((a, i) => ({ ...a, keyCount: keysByApp.get(a._id) || 0, previews: previews[i] })),
     error: null,
     form: {},
     openCreate: req.query.new === '1',
@@ -67,7 +61,7 @@ exports.create = async (req, res) => {
   const slug = v.slugify(body.slug || name);
 
   const fail = async (error) => {
-    const apps = await App.find().sort({ name: 1 }).lean();
+    const apps = await db.apps.list();
     res.status(400).render('apps/index', {
       title: 'Apps',
       section: 'apps',
@@ -80,27 +74,26 @@ exports.create = async (req, res) => {
 
   if (!name) return fail('Give the app a name.');
   if (!v.SLUG_RE.test(slug)) return fail('The folder needs 2 to 40 latin letters, numbers or dashes. Type one in the folder field.');
-  if (await App.exists({ slug })) return fail(`The folder "${slug}" is already used by another app.`);
+  if (await db.apps.slugTaken(slug)) return fail(`The folder "${slug}" is already used by another app.`);
 
-  const appDoc = await App.create({ name, slug });
-  req.session.newKey = { appId: String(appDoc._id), ...(await createKey(appDoc, 'default')) };
-  req.flash('ok', `${name} is ready. Copy its API key below.`);
-  res.redirect(`/apps/${appDoc._id}/keys`);
+  const appDoc = await db.apps.create({ name, slug });
+  req.flash('ok', `${name} is ready. Open its integration guide, then generate an API key when you are ready to connect it.`);
+  res.redirect(`/apps/${appDoc._id}`);
 };
 
 // App pages
 
 exports.overview = async (req, res) => {
   const [recent, activeKeys] = await Promise.all([
-    Image.find({ app: req.appDoc._id }).sort({ createdAt: -1 }).limit(8).populate('app', 'name slug').lean(),
-    ApiKey.countDocuments({ app: req.appDoc._id, revokedAt: null }),
+    db.assets.recent({ appId: req.appDoc._id, limit: 8 }),
+    db.keys.countActive(req.appDoc._id),
   ]);
   const locals = await withStorage(baseLocals(req, 'overview'), req.appDoc);
   res.render('apps/show', { ...locals, recent, activeKeys, publicUrl: config.publicUrl });
 };
 
 exports.keys = async (req, res) => {
-  const keys = await ApiKey.find({ app: req.appDoc._id }).sort({ revokedAt: 1, createdAt: -1 }).lean();
+  const keys = await db.keys.listForApp(req.appDoc._id);
   let newKey = null;
   if (req.session.newKey && req.session.newKey.appId === String(req.appDoc._id)) {
     newKey = req.session.newKey;
@@ -115,21 +108,21 @@ exports.createKey = async (req, res) => {
 };
 
 exports.revokeKey = async (req, res) => {
-  if (!v.OBJECT_ID_RE.test(req.params.keyId)) throw new HttpError(404, 'not_found', 'Key not found');
-  await ApiKey.updateOne({ _id: req.params.keyId, app: req.appDoc._id, revokedAt: null }, { revokedAt: new Date() });
+  if (!v.ID_RE.test(req.params.keyId)) throw new HttpError(404, 'not_found', 'Key not found');
+  await db.keys.revoke(req.appDoc._id, req.params.keyId);
   req.flash('ok', 'Key revoked. Requests using it now get a 401.');
   res.redirect(`/apps/${req.appDoc._id}/keys`);
 };
 
 exports.settings = async (req, res) => {
   const [imageCount, buckets] = await Promise.all([
-    Image.countDocuments({ app: req.appDoc._id }),
-    Bucket.find().sort({ isDefault: -1, name: 1 }),
+    db.assets.count({ appId: req.appDoc._id }),
+    db.buckets.list(),
   ]);
   res.render('apps/settings', {
     ...(await withStorage(baseLocals(req, 'settings'), req.appDoc)),
     imageCount,
-    buckets: buckets.map((b) => b.toCard()),
+    buckets: buckets.map(db.buckets.card),
     globalMaxMB: config.limits.maxUploadMB,
     fits: v.FITS,
   });
@@ -138,49 +131,49 @@ exports.settings = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   const appDoc = req.appDoc;
   const body = req.body || {};
+  const patch = {};
   try {
-    appDoc.variants = v.parseVariantRows(body);
+    patch.variants = v.parseVariantRows(body);
   } catch (err) {
     if (!(err instanceof HttpError)) throw err;
     req.flash('error', err.message);
     return res.redirect(`/apps/${appDoc._id}/settings`);
   }
   const name = String(body.name || '').trim().slice(0, 80);
-  if (name) appDoc.name = name;
-  if (v.FORMATS.includes(body.format)) appDoc.format = body.format;
-  appDoc.quality = v.clampInt(body.quality, appDoc.quality, 30, 100);
-  appDoc.maxUploadMB = v.clampInt(body.maxUploadMB, appDoc.maxUploadMB, 1, config.limits.maxUploadMB);
-  appDoc.keepOriginal = body.keepOriginal === 'on';
-  appDoc.allowDocuments = body.allowDocuments === 'on';
-  appDoc.allowArchives = body.allowArchives === 'on';
+  if (name) patch.name = name;
+  if (v.FORMATS.includes(body.format)) patch.format = body.format;
+  patch.quality = v.clampInt(body.quality, appDoc.quality, 30, 100);
+  patch.maxUploadMB = v.clampInt(body.maxUploadMB, appDoc.maxUploadMB, 1, config.limits.maxUploadMB);
+  patch.keepOriginal = body.keepOriginal === 'on';
+  patch.allowDocuments = body.allowDocuments === 'on';
+  patch.allowArchives = body.allowArchives === 'on';
 
   const wanted = String(body.bucket || '').trim();
   if (wanted === '') {
-    appDoc.bucket = null;
-  } else if (v.OBJECT_ID_RE.test(wanted)) {
-    const chosen = await Bucket.findById(wanted);
+    patch.bucket = null;
+  } else if (v.ID_RE.test(wanted)) {
+    const chosen = await db.buckets.get(wanted);
     if (!chosen) {
       req.flash('error', 'That storage no longer exists.');
       return res.redirect(`/apps/${appDoc._id}/settings`);
     }
-    appDoc.bucket = chosen._id;
+    patch.bucket = chosen._id;
   }
-  await appDoc.save();
+  await db.apps.update(appDoc._id, patch);
 
   req.flash('ok', 'Settings saved. New uploads use them, existing files keep theirs and their URLs.');
   res.redirect(`/apps/${appDoc._id}/settings`);
 };
 
 exports.toggle = async (req, res) => {
-  req.appDoc.active = !req.appDoc.active;
-  await req.appDoc.save();
-  req.flash('ok', req.appDoc.active ? 'App enabled. Its keys work again.' : 'App disabled. Its keys are rejected until you enable it.');
+  const appDoc = await db.apps.update(req.appDoc._id, { active: !req.appDoc.active });
+  req.flash('ok', appDoc.active ? 'App enabled. Its keys work again.' : 'App disabled. Its keys are rejected until you enable it.');
   res.redirect(`/apps/${req.appDoc._id}/settings`);
 };
 
 exports.destroy = async (req, res) => {
   const appDoc = req.appDoc;
-  const count = await Image.countDocuments({ app: appDoc._id });
+  const count = await db.assets.count({ appId: appDoc._id });
   if (count > 0) {
     req.flash('error', `Delete the ${count} ${count === 1 ? 'file' : 'files'} of this app first.`);
     return res.redirect(`/apps/${appDoc._id}/settings`);
@@ -189,8 +182,8 @@ exports.destroy = async (req, res) => {
     req.flash('error', `Type "${appDoc.slug}" to confirm.`);
     return res.redirect(`/apps/${appDoc._id}/settings`);
   }
-  await ApiKey.deleteMany({ app: appDoc._id });
-  await App.deleteOne({ _id: appDoc._id });
+  await db.keys.removeForApp(appDoc._id);
+  await db.apps.remove(appDoc._id);
   req.flash('ok', `Deleted ${appDoc.name}.`);
   res.redirect('/apps');
 };
@@ -207,7 +200,7 @@ exports.integration = async (req, res) => {
 };
 
 exports.downloadGuide = async (req, res) => {
-  res.attachment(`${req.appDoc.slug}-image-api.md`);
+  res.attachment(`${req.appDoc.slug}-files-api.md`);
   res.type('text/markdown; charset=utf-8');
   res.send(await buildDocs(req.appDoc));
 };
@@ -224,5 +217,5 @@ exports.upload = async (req, res) => {
     folder: v.sanitizeFolder((req.body || {}).folder),
     source: 'dashboard',
   });
-  res.status(duplicate ? 200 : 201).json({ ...image.toApi(), duplicate });
+  res.status(duplicate ? 200 : 201).json({ ...db.assets.toApi(image), duplicate });
 };

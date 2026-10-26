@@ -1,0 +1,15 @@
+<%- include('_start') %>
+<form class="panel setup-card" method="post" action="/setup/token">
+  <h1>Set up <%= appName %></h1>
+  <p class="lead">This instance has not been set up yet. To prove you run the server, paste the setup token it printed in its log when it started.</p>
+  <% if (error) { %>
+    <div class="alert alert-danger field" role="alert"><%- icon('alert') %><div><%= error %></div></div>
+  <% } %>
+  <div class="field">
+    <label for="token">Setup token</label>
+    <input id="token" name="token" type="text" autocomplete="off" spellcheck="false" required autofocus class="mono">
+    <p class="hint">Look for the line starting <code>[files360]</code> with <code>/setup?token=</code>. A new token is printed every time the server starts.</p>
+  </div>
+  <button class="btn btn-primary" type="submit">Continue</button>
+</form>
+<%- include('_end') %>

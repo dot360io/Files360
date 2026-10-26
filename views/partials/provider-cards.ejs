@@ -1,0 +1,24 @@
+<%# Provider picker, shared by Storage and the setup wizard. Needs providers and base. %>
+<div class="provider-cards">
+  <% providers.forEach(function (p) { %>
+    <a class="panel provider-card" href="<%= base %>/<%= p.id %>">
+      <span class="provider-logo-wrap"><%- logo(p.id) %></span>
+      <span class="provider-name">
+        <strong><%= p.label %></strong>
+        <small><%= p.product %></small>
+      </span>
+      <span class="provider-blurb"><%= p.blurb %></span>
+      <span class="provider-facts">
+        <span class="fact">
+          <%- icon('database') %>
+          <%= p.regionFact || (p.regions ? p.regions.length + ' ' + p.regionLabel.toLowerCase() + (p.regions.length === 1 ? '' : 's') : 'Your own endpoint') %>
+        </span>
+        <span class="fact">
+          <%- icon(p.supportsAcl === false ? 'info' : 'check') %>
+          <%= p.supportsAcl === false ? 'Bucket-wide access' : 'Per-object ACLs' %>
+        </span>
+      </span>
+      <span class="provider-cta">Connect<%- icon('chevronRight') %></span>
+    </a>
+  <% }) %>
+</div>

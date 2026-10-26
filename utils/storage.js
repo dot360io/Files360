@@ -1,5 +1,5 @@
 const { S3Client, PutObjectCommand, DeleteObjectCommand, HeadBucketCommand } = require('@aws-sdk/client-s3');
-const Bucket = require('../models/Bucket');
+const buckets = require('../db/buckets');
 const { HttpError } = require('./errors');
 
 // One S3Client per bucket, rebuilt when the connection details change
@@ -7,7 +7,7 @@ const clients = new Map();
 
 function clientFor(bucketDoc) {
   const id = String(bucketDoc._id);
-  const signature = bucketDoc.signature();
+  const signature = buckets.signature(bucketDoc);
   const cached = clients.get(id);
   if (cached && cached.signature === signature) return cached.client;
 
@@ -16,7 +16,7 @@ function clientFor(bucketDoc) {
     ...(bucketDoc.endpoint ? { endpoint: bucketDoc.endpoint } : {}),
     region: bucketDoc.region || 'us-east-1',
     forcePathStyle: Boolean(bucketDoc.forcePathStyle),
-    credentials: { accessKeyId: bucketDoc.accessKey, secretAccessKey: bucketDoc.secret() },
+    credentials: { accessKeyId: bucketDoc.accessKey, secretAccessKey: buckets.secretOf(bucketDoc) },
     // Newer SDK versions add checksums by default that some S3-compatible
     // providers reject. Only send them when the operation requires it.
     requestChecksumCalculation: 'WHEN_REQUIRED',
@@ -130,12 +130,12 @@ function describe(err, fallback) {
 /* Which bucket an upload or a delete belongs to */
 
 async function defaultBucket() {
-  return (await Bucket.findOne({ isDefault: true, active: true })) || (await Bucket.findOne({ active: true }));
+  return buckets.defaultBucket();
 }
 
 async function forApp(app) {
   if (app.bucket) {
-    const own = await Bucket.findById(app.bucket);
+    const own = await buckets.get(app.bucket);
     if (own && own.active) return own;
     if (own) throw new HttpError(503, 'storage_disabled', `The storage "${own.name}" is turned off`);
   }
@@ -149,7 +149,7 @@ async function forApp(app) {
 /** Images keep their own bucket so re-pointing an app never orphans old files. */
 async function forImage(image) {
   if (image.bucket) {
-    const own = await Bucket.findById(image.bucket);
+    const own = await buckets.get(image.bucket);
     if (own) return own;
   }
   const fallback = await defaultBucket();
@@ -176,11 +176,10 @@ async function refreshOrigins() {
 }
 
 async function publicOrigins() {
-  const buckets = await Bucket.find({}, 'publicUrl').lean();
   const origins = new Set();
-  for (const b of buckets) {
+  for (const publicUrl of await buckets.publicUrls()) {
     try {
-      if (b.publicUrl) origins.add(new URL(b.publicUrl).origin);
+      origins.add(new URL(publicUrl).origin);
     } catch {
       // A malformed URL just does not widen the policy
     }

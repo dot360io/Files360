@@ -43,7 +43,7 @@ Every response has a `kind` field, `"image"` or `"document"`. Check it before yo
 Every request needs your API key in the `Authorization` header:
 
 ```
-Authorization: Bearer img_xxxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Authorization: Bearer f360_xxxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 `X-API-Key: <key>` is accepted as well.
@@ -56,7 +56,7 @@ Suggested environment variables:
 
 ```
 FILES360_API_URL={{BASE_URL}}
-FILES360_API_KEY=img_...
+FILES360_API_KEY=f360_...
 ```
 
 Test the connection:
@@ -94,24 +94,24 @@ Settings can change over time. Call `GET /v1/me` to read the current configurati
 | Method | Path | What it does |
 | --- | --- | --- |
 | `GET` | `/v1/me` | Returns your app configuration. Use it to test a key. |
-| `POST` | `/v1/images` | Uploads a file (multipart): an image is optimized, a document is stored as is. |
-| `POST` | `/v1/images/from-url` | Downloads a file from a public URL and handles it the same way. |
-| `GET` | `/v1/images` | Lists your files, newest first. |
-| `GET` | `/v1/images/:id` | Returns one file. |
-| `DELETE` | `/v1/images/:id` | Deletes a file and everything stored for it. |
+| `POST` | `/v1/files` | Uploads a file (multipart): an image is optimized, a document is stored as is. |
+| `POST` | `/v1/files/from-url` | Downloads a file from a public URL and handles it the same way. |
+| `GET` | `/v1/files` | Lists your files, newest first. |
+| `GET` | `/v1/files/:id` | Returns one file. |
+| `DELETE` | `/v1/files/:id` | Deletes a file and everything stored for it. |
 
 ### Upload a file
 
-`POST /v1/images` with `multipart/form-data`:
+`POST /v1/files` with `multipart/form-data`:
 
 | Field | Required | Description |
 | --- | --- | --- |
 | `file` | yes | The image or document file. |
 | `folder` | no | Sub folder inside your app folder, e.g. `products` or `users/avatars`. Lowercase `a-z`, `0-9`, `-`, `_`, up to 5 levels. |
-| `ref` | no | Your own reference, e.g. a product or user id (max 120 characters). Lets you find files later with `GET /v1/images?ref=`. |
+| `ref` | no | Your own reference, e.g. a product or user id (max 120 characters). Lets you find files later with `GET /v1/files?ref=`. |
 
 ```bash
-curl -X POST "$FILES360_API_URL/v1/images" \
+curl -X POST "$FILES360_API_URL/v1/files" \
   -H "Authorization: Bearer $FILES360_API_KEY" \
   -F "file=@./IMG_2231.jpg" \
   -F "folder=products" \
@@ -133,7 +133,7 @@ Response `201 Created`:
 {{DOCUMENTS_INTRO}}
 
 ```bash
-curl -X POST "$FILES360_API_URL/v1/images" \
+curl -X POST "$FILES360_API_URL/v1/files" \
   -H "Authorization: Bearer $FILES360_API_KEY" \
   -F "file=@./rental-terms.pdf" \
   -F "folder=contracts" \
@@ -165,10 +165,10 @@ The 97-2003 formats are stored and served like any other file; only their proper
 
 ### Import from a URL
 
-`POST /v1/images/from-url` with a JSON body. Useful for migrating files you already host somewhere.
+`POST /v1/files/from-url` with a JSON body. Useful for migrating files you already host somewhere.
 
 ```bash
-curl -X POST "$FILES360_API_URL/v1/images/from-url" \
+curl -X POST "$FILES360_API_URL/v1/files/from-url" \
   -H "Authorization: Bearer $FILES360_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/photo.jpg", "folder": "products", "ref": "product-1042"}'
@@ -178,7 +178,7 @@ The URL must be public (http or https). Images and documents both work: what com
 
 ### List files
 
-`GET /v1/images?page=1&limit=50&folder=products&ref=product-1042`
+`GET /v1/files?page=1&limit=50&folder=products&ref=product-1042`
 
 All parameters are optional. `limit` goes up to 200. Images and documents come back in the same list, told apart by `kind`.
 
@@ -188,12 +188,12 @@ All parameters are optional. `limit` goes up to 200. Images and documents come b
 
 ### Get one file
 
-`GET /v1/images/:id` returns the same object as the upload, image or document.
+`GET /v1/files/:id` returns the same object as the upload, image or document.
 
 ### Delete a file
 
 ```bash
-curl -X DELETE "$FILES360_API_URL/v1/images/66f1c2a9e4b0a1d2c3f4e5a6" \
+curl -X DELETE "$FILES360_API_URL/v1/files/66f1c2a9e4b0a1d2c3f4e5a6" \
   -H "Authorization: Bearer $FILES360_API_KEY"
 ```
 
@@ -213,7 +213,7 @@ async function uploadImage(filePath, { folder, ref } = {}) {
   if (folder) form.append('folder', folder);
   if (ref) form.append('ref', ref);
 
-  const res = await fetch(process.env.FILES360_API_URL + '/v1/images', {
+  const res = await fetch(process.env.FILES360_API_URL + '/v1/files', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },
     body: form,
@@ -250,7 +250,7 @@ router.post('/products/:id/photos', upload.single('photo'), async (req, res) => 
   form.append('folder', 'products');
   form.append('ref', req.params.id);
 
-  const apiRes = await fetch(process.env.FILES360_API_URL + '/v1/images', {
+  const apiRes = await fetch(process.env.FILES360_API_URL + '/v1/files', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },
     body: form,
@@ -258,7 +258,7 @@ router.post('/products/:id/photos', upload.single('photo'), async (req, res) => 
   const image = await apiRes.json();
   if (!apiRes.ok) return res.status(apiRes.status).json(image);
 
-  // Save what you need on your own record, for example with Mongoose:
+  // Save what you need on your own record, for example:
   // await Product.updateOne(
   //   { _id: req.params.id },
   //   { $push: { photos: { imageId: image.id, {{V_SMALL}}: image.variants.{{V_SMALL}}.url, {{V_LARGE}}: image.variants.{{V_LARGE}}.url, srcset: image.srcset } } }
@@ -274,7 +274,7 @@ module.exports = router;
 
 ```js
 async function deleteImage(imageId) {
-  const res = await fetch(process.env.FILES360_API_URL + '/v1/images/' + imageId, {
+  const res = await fetch(process.env.FILES360_API_URL + '/v1/files/' + imageId, {
     method: 'DELETE',
     headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },
   });
@@ -295,7 +295,7 @@ function upload_image(string $path, string $folder = '', string $ref = ''): arra
     if ($folder !== '') $fields['folder'] = $folder;
     if ($ref !== '') $fields['ref'] = $ref;
 
-    $ch = curl_init(getenv('FILES360_API_URL') . '/v1/images');
+    $ch = curl_init(getenv('FILES360_API_URL') . '/v1/files');
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_RETURNTRANSFER => true,
@@ -373,6 +373,6 @@ For retries, wait 1 s, then 2 s, then 4 s, and stop after 4 attempts. Uploads ar
 - **Branch on `kind`.** `image` gives you `variants` and `srcset`, `document` gives you `file.url`.
 - **URLs never change.** They are cached for a year. To replace a file, upload the new one, save its URLs, then delete the old record.
 - **Use folders for structure,** e.g. `products`, `users/avatars`, `events/2026`. Folders only group files, they have no permissions.
-- **Use `ref`** to link files to your own records and find them with `GET /v1/images?ref=...`.
+- **Use `ref`** to link files to your own records and find them with `GET /v1/files?ref=...`.
 - **Keep uploads server side** and protect your own upload route (auth, size limit, rate limit).
 - **Set a timeout** of about 60 seconds on upload requests. Large photos take a few seconds to process.

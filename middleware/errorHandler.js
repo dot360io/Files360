@@ -22,9 +22,6 @@ module.exports = function errorHandler(err, req, res, next) {
     status = 400;
     code = 'invalid_json';
     message = 'Request body is not valid JSON';
-  } else if (err.name === 'ValidationError') {
-    status = 400;
-    code = 'validation_error';
   } else if (!(err instanceof HttpError) && status >= 500) {
     console.error(`[error] ${req.method} ${req.originalUrl}`, err);
     code = 'server_error';

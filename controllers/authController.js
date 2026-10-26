@@ -1,6 +1,10 @@
 const bcrypt = require('bcryptjs');
-const config = require('../config/env');
+const db = require('../db');
 const { safeNext } = require('../middleware/auth');
+
+// Compared against when the email is unknown, so a wrong email costs the same
+// bcrypt time as a wrong password and timing does not reveal which emails exist
+const NO_SUCH_ADMIN = bcrypt.hashSync('files360-no-such-admin', 12);
 
 exports.showLogin = (req, res) => {
   if (req.session.admin) return res.redirect('/');
@@ -9,16 +13,15 @@ exports.showLogin = (req, res) => {
 
 exports.login = async (req, res) => {
   const body = req.body || {};
-  const email = String(body.email || '').trim().toLowerCase();
-  // Always compare the password so timing does not reveal the email
-  const passwordOk = await bcrypt.compare(String(body.password || ''), config.admin.passwordHash);
+  const admin = await db.admins.findByEmail(body.email);
+  const passwordOk = await bcrypt.compare(String(body.password || ''), admin ? admin.passwordHash : NO_SUCH_ADMIN);
   const next = safeNext(body.next);
 
-  if (!passwordOk || email !== config.admin.email) {
+  if (!admin || !passwordOk) {
     return res.status(401).render('auth/login', { title: 'Sign in', error: 'Email or password is wrong.', next });
   }
   await new Promise((resolve, reject) => req.session.regenerate((err) => (err ? reject(err) : resolve())));
-  req.session.admin = { email };
+  req.session.admin = { id: admin._id, email: admin.email };
   res.redirect(next);
 };
 

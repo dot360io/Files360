@@ -6,6 +6,10 @@
  * fixed list, and whether per-object ACLs exist. A preset fills all of that in
  * so the admin only pastes a bucket name and a key pair.
  *
+ * `referral` feeds the storage table that scripts/build-docs.js writes into the
+ * README and the docs site. It is never rendered by the app itself: people are
+ * forgiving about a README and hostile about monetized software on their server.
+ *
  * Templates use {region}, {bucket} and {account}. They are read on the server
  * and shipped to the browser as JSON so the connect form can fill itself in
  * while the admin types.
@@ -15,6 +19,8 @@ const PROVIDERS = [
   {
     id: 'hetzner',
     site: 'https://www.hetzner.com',
+    // Referral link for the README storage table only, never shown in the dashboard
+    referral: '',
     label: 'Hetzner',
     product: 'Object Storage',
     blurb: 'European buckets, low egress cost.',
@@ -34,6 +40,7 @@ const PROVIDERS = [
   {
     id: 'digitalocean',
     site: 'https://www.digitalocean.com',
+    referral: '',
     label: 'DigitalOcean',
     product: 'Spaces',
     blurb: 'Spaces with the built-in CDN edge.',
@@ -61,6 +68,7 @@ const PROVIDERS = [
   {
     id: 'aws',
     site: 'https://aws.amazon.com',
+    referral: '',
     label: 'Amazon',
     product: 'S3',
     blurb: 'The original. Pair it with CloudFront if you want.',
@@ -94,6 +102,7 @@ const PROVIDERS = [
   {
     id: 'r2',
     site: 'https://www.cloudflare.com',
+    referral: '',
     label: 'Cloudflare',
     product: 'R2',
     blurb: 'No egress fees. Needs a public r2.dev or custom domain.',
@@ -115,6 +124,7 @@ const PROVIDERS = [
   {
     id: 'backblaze',
     site: 'https://www.backblaze.com',
+    referral: '',
     label: 'Backblaze',
     product: 'B2',
     blurb: 'Cheapest per TB, free egress through Cloudflare.',
@@ -138,6 +148,7 @@ const PROVIDERS = [
   {
     id: 'wasabi',
     site: 'https://wasabi.com',
+    referral: '',
     label: 'Wasabi',
     product: 'Hot Cloud Storage',
     blurb: 'Flat pricing, no egress charges.',
@@ -166,6 +177,7 @@ const PROVIDERS = [
   {
     id: 'scaleway',
     site: 'https://www.scaleway.com',
+    referral: '',
     label: 'Scaleway',
     product: 'Object Storage',
     blurb: 'French provider, S3 compatible.',
@@ -185,6 +197,7 @@ const PROVIDERS = [
   {
     id: 'minio',
     site: 'https://min.io',
+    referral: '',
     label: 'MinIO',
     product: 'Self-hosted',
     blurb: 'Your own S3 server. Path-style URLs.',
@@ -203,7 +216,7 @@ const PROVIDERS = [
     id: 'custom',
     label: 'Other',
     product: 'S3-compatible',
-    blurb: 'Any provider with an S3 API: Storj, iDrive e2, OVH, Linode, GCS.',
+    blurb: 'Any provider with an S3 API: Garage, SeaweedFS, Storj, iDrive e2, OVH, Linode, GCS.',
     endpoint: '',
     publicUrl: '',
     sdkRegion: 'us-east-1',
@@ -213,7 +226,7 @@ const PROVIDERS = [
     regionLabel: 'Region',
     regions: null,
     credsHelp: 'Use the access key and secret your provider issues for its S3 API.',
-    publicHelp: 'Paste the endpoint from your provider and the base URL the objects are served from.',
+    publicHelp: 'Paste the endpoint from your provider and the base URL the objects are served from. Garage has no per-object permissions, so an app that keeps original uploads should only use a Garage bucket where public originals are acceptable.',
   },
 ];
 

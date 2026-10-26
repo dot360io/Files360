@@ -1,0 +1,20 @@
+# One container, one volume, SQLite. Start it, then read the setup link from
+# the log:  docker compose up -d && docker compose logs files360 | grep setup
+services:
+  files360:
+    image: ghcr.io/dot360io/files360:latest
+    # build: .
+    restart: unless-stopped
+    ports:
+      - "4360:4360"
+    environment:
+      # The address people reach this service at, used in generated docs
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4360}
+      # Uncomment to skip the wizard and create the administrator from here
+      # ADMIN_EMAIL: you@example.com
+      # ADMIN_PASSWORD: a-long-password
+    volumes:
+      - files360-data:/data
+
+volumes:
+  files360-data:

@@ -2,8 +2,8 @@
 <%- include('../partials/app-header') %>
 
 <%
-  const node = "const form = new FormData();\nform.append('file', new Blob([buffer]), 'photo.jpg');\nform.append('folder', 'products');\n\nconst res = await fetch(process.env.FILES360_API_URL + '/v1/images', {\n  method: 'POST',\n  headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },\n  body: form,\n});\nconst image = await res.json();\n// image.variants." + app.variants[app.variants.length - 1].name + ".url";
-  const env = 'FILES360_API_URL=' + publicUrl + '\nFILES360_API_KEY=img_...';
+  const node = "const form = new FormData();\nform.append('file', new Blob([buffer]), 'photo.jpg');\nform.append('folder', 'products');\n\nconst res = await fetch(process.env.FILES360_API_URL + '/v1/files', {\n  method: 'POST',\n  headers: { Authorization: 'Bearer ' + process.env.FILES360_API_KEY },\n  body: form,\n});\nconst image = await res.json();\n// image.variants." + app.variants[app.variants.length - 1].name + ".url";
+  const env = 'FILES360_API_URL=' + publicUrl + '\nFILES360_API_KEY=f360_...';
 %>
 
 <div class="grid-2-1">
@@ -65,11 +65,11 @@
         <table class="data-table">
           <tbody>
             <tr><td><span class="badge">GET</span></td><td><code>/v1/me</code></td></tr>
-            <tr><td><span class="badge">POST</span></td><td><code>/v1/images</code></td></tr>
-            <tr><td><span class="badge">POST</span></td><td><code>/v1/images/from-url</code></td></tr>
-            <tr><td><span class="badge">GET</span></td><td><code>/v1/images</code></td></tr>
-            <tr><td><span class="badge">GET</span></td><td><code>/v1/images/:id</code></td></tr>
-            <tr><td><span class="badge">DELETE</span></td><td><code>/v1/images/:id</code></td></tr>
+            <tr><td><span class="badge">POST</span></td><td><code>/v1/files</code></td></tr>
+            <tr><td><span class="badge">POST</span></td><td><code>/v1/files/from-url</code></td></tr>
+            <tr><td><span class="badge">GET</span></td><td><code>/v1/files</code></td></tr>
+            <tr><td><span class="badge">GET</span></td><td><code>/v1/files/:id</code></td></tr>
+            <tr><td><span class="badge">DELETE</span></td><td><code>/v1/files/:id</code></td></tr>
           </tbody>
         </table>
       </div>
