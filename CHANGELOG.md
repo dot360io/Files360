@@ -4,6 +4,8 @@ All notable changes to Files360. The format follows [Keep a Changelog](https://k
 
 ## Unreleased
 
+## 1.0.0 - 2026-10-26
+
 The first public release.
 
 ### Upload API
